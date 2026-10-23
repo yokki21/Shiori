@@ -1,4 +1,5 @@
 import { db, uid } from './db.js';
+import { loadCatalog, catalogSeries, catalogIssue, catalogByIsbn, searchCatalog } from './catalog.js';
 import { Scanner, scanFile } from './scanner.js';
 import { lookupCode, searchTitle, normalizeIsbn, isIsbn, isIssnEan, issnFromEan, eanFromIssn, parseTitle, normalizePublisher, guessType, setGoogleKey, testGoogle } from './lookup.js';
 
@@ -949,12 +950,16 @@ function guessIssueNumber(addon, nums) {
 async function handleIssn(code, addon, { burst, quick, dest }) {
   const issn = issnFromEan(code);
   const ctx = issnContext(issn);
+  await loadCatalog();
+  const cat = catalogSeries(issn);
+  if (cat) Object.assign(ctx, { series: cat.name, publisher: cat.publisher || ctx.publisher, type: cat.type || ctx.type });
   const g = guessIssueNumber(addon, ctx.nums);
   if (g.from === 'addon') {
     const existing = state.comics.find((c) => c.issn === issn && c.number === g.n);
     if (existing) { await handleExisting(existing, burst || quick, dest); return; }
   }
-  const d = newDraft({
+  const issue = cat && g.n != null ? catalogIssue(cat, g.n) : null;
+  const d = newDraft(issue || {
     title: ctx.series && g.n != null ? `${ctx.series} nº ${g.n}` : '',
     series: ctx.series, number: g.n, publisher: ctx.publisher, type: ctx.type, price: ctx.price,
   }, dest);
@@ -974,7 +979,9 @@ async function handleIssn(code, addon, { burst, quick, dest }) {
   const num = g.from === 'addon'
     ? ` El número ${g.n} sale del código pequeño de la derecha: compruébalo.`
     : g.from === 'next' ? ` No he podido leer el número; te propongo el ${g.n}, el siguiente al último que tienes.` : '';
-  const notice = ctx.series
+  const notice = cat
+    ? `Es ${cat.name} (${cat.publisher}).${g.from === 'addon' ? '' : ' No he podido leer el número en el código pequeño: escríbelo y guarda.'}`
+    : ctx.series
     ? `Revista con ISSN ${issn}: es de tu serie ${ctx.series}.${num}`
     : `Este cómic lleva ISSN (${issn}), que identifica la colección y no cada número, así que no sale en las bases de datos. Escribe el nombre de la serie una vez: los próximos números de esta colección se rellenarán solos.${g.n != null ? ` El código pequeño indica el nº ${g.n}.` : ''}`;
   // Sin enfocar ningún campo a mano: en iPhone desplaza la pantalla y la ficha se queda fuera de la vista
@@ -991,7 +998,9 @@ async function handleCode(code, { fromScanner = false, addon = null } = {}) {
   if (existing) { await handleExisting(existing, burst || quick, dest); return; }
 
   status(`Buscando ${code}…`);
-  const res = await lookupCode(code);
+  await loadCatalog();
+  const fromCat = catalogByIsbn(code);
+  const res = fromCat ? { status: 'ok', data: fromCat } : await lookupCode(code);
   const d = newDraft(res.status === 'ok' ? res.data : { isbn: code }, dest);
 
   if (burst || (quick && res.status === 'ok' && d.title)) {
@@ -1101,7 +1110,16 @@ $('#find-form').addEventListener('submit', async (e) => {
   box.innerHTML = '<div class="spinner"></div>';
   let google = null;
   try {
-    ({ results: lastResults, google } = await searchTitle(q));
+    await loadCatalog();
+    const local = searchCatalog(q);
+    try {
+      ({ results: lastResults, google } = await searchTitle(q));
+    } catch (e) {
+      if (!local.length) throw e;
+      lastResults = [];
+    }
+    const seenIsbn = new Set(local.map((r) => r.isbn).filter(Boolean));
+    lastResults = [...local, ...lastResults.filter((r) => !r.isbn || !seenIsbn.has(r.isbn))];
   } catch {
     box.innerHTML = '<p class="muted">No se ha podido buscar. Comprueba la conexión.</p><button class="btn wide" id="find-manual">Añadir a mano</button>';
     return;
@@ -1124,6 +1142,10 @@ $('#find-results').addEventListener('click', async (e) => {
   if (!b) return;
   let r = lastResults[+b.dataset.r];
   if (r.isbn && state.comics.some((c) => c.isbn === r.isbn)) { await handleCode(r.isbn); return; }
+  if (r.issn) {
+    const have = state.comics.find((c) => c.issn === r.issn && c.number === r.number);
+    if (have) { await closeAllLayers(); openComic(have, { notice: have.status === 'coleccion' ? 'Ya lo tienes en tu colección.' : 'Ya está en tu lista de Lo quiero.' }); return; }
+  }
   if (r.needsLookup && r.isbn) {
     // Resultado de Open Library: trae los datos de esa edición concreta
     b.disabled = true;
@@ -1145,6 +1167,7 @@ $('#find-results').addEventListener('click', async (e) => {
     else r = { ...r, cover: null };
   }
   const d = newDraft(r, state.scanDest);
+  if (r.issn) Object.assign(d, { issn: r.issn, barcode: r.barcode || null });
   await closeAllLayers();
   openComic(d, { isNew: true });
 });
@@ -1183,6 +1206,7 @@ async function init() {
   } catch {
     toast('No se puede guardar en este navegador (¿modo privado?)');
   }
+  loadCatalog();
   showView('library');
   if (location.hash === '#scan') openScanner();
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
