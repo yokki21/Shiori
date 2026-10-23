@@ -1,6 +1,6 @@
 import { db, uid } from './db.js';
 import { Scanner, scanFile } from './scanner.js';
-import { lookupCode, searchTitle, normalizeIsbn, isIsbn, parseTitle, normalizePublisher, guessType } from './lookup.js';
+import { lookupCode, searchTitle, normalizeIsbn, isIsbn, parseTitle, normalizePublisher, guessType, setGoogleKey, testGoogle } from './lookup.js';
 
 // ---------- Estado ----------
 const state = {
@@ -547,6 +547,22 @@ $('#stats').addEventListener('click', (e) => {
 });
 
 // ---------- Ajustes ----------
+$('#google-save').addEventListener('click', async () => {
+  const k = $('#google-key').value.trim();
+  setGoogleKey(k);
+  await db.setKv('googleKey', k);
+  await runGoogleTest();
+});
+$('#google-test').addEventListener('click', runGoogleTest);
+async function runGoogleTest() {
+  const out = $('#google-status');
+  out.textContent = 'Probando…';
+  const r = await testGoogle();
+  out.textContent = r.ok
+    ? 'Google Books funciona correctamente.'
+    : ({ quota: 'Sin clave propia: la cuota compartida está agotada. Añade tu clave.', 'quota-own': 'Tu clave ha gastado las búsquedas de hoy.', badkey: 'Google rechaza esta clave. Comprueba que la copiaste entera, que la Books API está activada y que la restricción de sitio incluye yokki21.github.io.', blocked: 'Google ha rechazado la petición.', network: 'No hay conexión con Google Books.' }[r.problem] || 'Error desconocido') + (r.status ? ` (error ${r.status})` : '');
+}
+
 async function renderSettings() {
   const last = await db.getKv('lastBackup');
   $('#last-backup').textContent = last
@@ -669,6 +685,7 @@ function fillForm() {
   refreshCover();
   $('#comic-delete').hidden = draftIsNew;
   $('#comic-retry').hidden = !(d.isbn && (!d.title || !d.cover));
+  $('#comic-search').hidden = !(draftIsNew && !d.title);
 }
 function refreshCover() {
   $('#comic-cover').innerHTML = coverHTML({ ...draft, title: F.title.value || draft.title, series: F.series.value || draft.series, number: parseIntOrNull(F.number.value) });
@@ -910,15 +927,25 @@ async function handleCode(code, { fromScanner = false } = {}) {
   }
 
   await closeAllLayers();
+  const gProblem = res.google && res.google !== 'network' ? ` ${GOOGLE_MSG[res.google]}` : '';
   const notices = {
     ok: '',
     notfound: isIsbn(code)
-      ? 'No he encontrado este ISBN en Google Books ni en Open Library. Rellena los datos a mano y, si quieres, haz una foto a la portada.'
-      : `Este código (${code}) no es un ISBN; suele pasar con las grapas de quiosco. Rellena los datos a mano.`,
+      ? (gProblem
+        ? `No está en Open Library y Google Books no ha respondido.${gProblem} Mientras tanto, prueba «Buscar por título» o rellénalo a mano.`
+        : 'No he encontrado este ISBN en Google Books ni en Open Library. Prueba «Buscar por título» o rellénalo a mano.')
+      : `Este código (${code}) no es un ISBN; suele pasar con las grapas de quiosco. Prueba «Buscar por título» o rellénalo a mano.`,
     offline: 'Sin conexión. Guárdalo con el ISBN y luego pulsa «Buscar datos otra vez».',
   };
   openComic(d, { isNew: true, notice: notices[res.status], warn: res.status !== 'ok' });
 }
+
+const GOOGLE_MSG = {
+  quota: 'La cuota gratuita compartida de Google Books está agotada: añade tu propia clave en Ajustes.',
+  'quota-own': 'Has gastado las búsquedas diarias de tu clave de Google Books; mañana se renuevan.',
+  badkey: 'Google Books rechaza tu clave: revísala en Ajustes.',
+  blocked: 'Google Books ha rechazado la búsqueda.',
+};
 
 function burstLog(c, text, undoable = false) {
   const log = $('#burst-log');
@@ -941,7 +968,7 @@ function openFind(mode) {
   input.value = '';
   input.inputMode = mode === 'isbn' ? 'numeric' : 'text';
   input.placeholder = mode === 'isbn' ? '978…' : 'Ej.: Chainsaw Man 5';
-  $('#find-hint').textContent = mode === 'isbn' ? 'Los 13 dígitos que hay bajo el código de barras (o el ISBN de 10).' : 'Busca en Google Books en español. Si no aparece, puedes añadirlo a mano.';
+  $('#find-hint').textContent = mode === 'isbn' ? 'Los 13 dígitos que hay bajo el código de barras (o el ISBN de 10).' : 'Busca en Google Books y en Open Library. Incluye el número para afinar: «Berserk 3».';
   $('#find-results').innerHTML = mode === 'title' ? '<button class="btn wide" id="find-manual">Añadir a mano</button>' : '';
   openDialog($('#sheet-find'));
   setTimeout(() => input.focus(), 80);
@@ -949,6 +976,11 @@ function openFind(mode) {
 $('#sheet-find').addEventListener('close', () => scanner?.resume());
 $('#scan-manual').addEventListener('click', () => openFind('isbn'));
 $('#scan-title').addEventListener('click', () => openFind('title'));
+$('#btn-find').addEventListener('click', () => openFind('title'));
+$('#comic-search').addEventListener('click', async () => {
+  await closeAllLayers();
+  openFind('title');
+});
 
 let lastResults = [];
 $('#find-form').addEventListener('submit', async (e) => {
@@ -963,13 +995,15 @@ $('#find-form').addEventListener('submit', async (e) => {
   }
   const box = $('#find-results');
   box.innerHTML = '<div class="spinner"></div>';
+  let google = null;
   try {
-    lastResults = await searchTitle(q);
+    ({ results: lastResults, google } = await searchTitle(q));
   } catch {
     box.innerHTML = '<p class="muted">No se ha podido buscar. Comprueba la conexión.</p><button class="btn wide" id="find-manual">Añadir a mano</button>';
     return;
   }
-  box.innerHTML = (lastResults.length
+  const note = google && google !== 'network' ? `<p class="notice warn">Solo resultados de Open Library. ${GOOGLE_MSG[google]}</p>` : '';
+  box.innerHTML = note + (lastResults.length
     ? lastResults.map((r, i) => `<div class="row">${coverHTML(r)}<button class="row-main" data-r="${i}"><b>${esc(r.title)}</b><span>${esc([r.publisher, r.publishedDate?.slice(0, 4), r.isbn].filter(Boolean).join(', '))}</span></button><button class="btn small" data-r="${i}">Elegir</button></div>`).join('')
     : '<p class="muted">Sin resultados.</p>') + '<button class="btn wide" id="find-manual">Añadir a mano</button>';
 });
@@ -984,8 +1018,15 @@ $('#find-results').addEventListener('click', async (e) => {
   }
   const b = e.target.closest('[data-r]');
   if (!b) return;
-  const r = lastResults[+b.dataset.r];
+  let r = lastResults[+b.dataset.r];
   if (r.isbn && state.comics.some((c) => c.isbn === r.isbn)) { await handleCode(r.isbn); return; }
+  if (r.needsLookup && r.isbn) {
+    // Resultado de Open Library: trae los datos de esa edición concreta
+    b.disabled = true;
+    const res = await lookupCode(r.isbn);
+    if (res.status === 'ok') r = { ...r, ...res.data, cover: res.data.cover || null };
+    else r = { ...r, cover: null };
+  }
   const d = newDraft(r, state.scanDest);
   await closeAllLayers();
   openComic(d, { isNew: true });
@@ -1010,7 +1051,9 @@ $('#scan-photo').addEventListener('change', async (e) => {
 // ---------- Arranque ----------
 async function init() {
   try {
-    const [comics, series, lastType, sort] = await Promise.all([db.all('comics'), db.all('series'), db.getKv('lastType'), db.getKv('sort')]);
+    const [comics, series, lastType, sort, gkey] = await Promise.all([db.all('comics'), db.all('series'), db.getKv('lastType'), db.getKv('sort'), db.getKv('googleKey')]);
+    setGoogleKey(gkey || '');
+    $('#google-key').value = gkey || '';
     state.comics = comics;
     for (const s of series) state.seriesMeta.set(s.key, s);
     if (lastType) state.lastType = lastType;

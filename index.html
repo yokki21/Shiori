@@ -43,7 +43,10 @@
   <div class="app">
     <header class="topbar">
       <h1 id="screen-title">Biblioteca</h1>
-      <button class="icon-btn" id="btn-settings" aria-label="Ajustes y copia de seguridad"><svg><use href="#i-gear"/></svg></button>
+      <div class="top-actions">
+        <button class="icon-btn" id="btn-find" aria-label="Buscar un cómic por título para añadirlo"><svg><use href="#i-search"/></svg></button>
+        <button class="icon-btn" id="btn-settings" aria-label="Ajustes y copia de seguridad"><svg><use href="#i-gear"/></svg></button>
+      </div>
     </header>
 
     <main id="main">
@@ -109,6 +112,16 @@
           <p class="muted" id="storage-info">Comprobando…</p>
         </div>
         <div class="panel">
+          <h2>Clave de Google Books</h2>
+          <p class="muted">Sin clave, Shiori usa la cuota gratuita que comparte todo el mundo y casi siempre está agotada. Con una clave tuya (gratis) tienes 1.000 búsquedas al día solo para ti. Se guarda únicamente en este dispositivo.</p>
+          <label class="field" style="margin-top:10px"><span>Clave (empieza por AIza…)</span><input id="google-key" autocomplete="off" spellcheck="false" placeholder="AIza…"></label>
+          <div class="btn-row" style="margin-top:0">
+            <button class="btn primary small" id="google-save">Guardar y probar</button>
+            <button class="btn small" id="google-test">Probar conexión</button>
+          </div>
+          <p class="small" id="google-status" aria-live="polite" style="margin-top:8px"></p>
+        </div>
+        <div class="panel">
           <h2>De dónde salen los datos</h2>
           <p class="muted">Al escanear, Shiori busca el ISBN en Google Books y en Open Library. Si un tomo no aparece o le falta la portada, puedes completarlo a mano y hacerle una foto: se queda guardado en tu biblioteca.</p>
         </div>
@@ -168,6 +181,7 @@
             <label class="btn small"><svg><use href="#i-camera"/></svg>Foto de portada<input type="file" id="cover-photo" accept="image/*" capture="environment" hidden></label>
             <button type="button" class="btn small" id="cover-remove">Quitar portada</button>
             <button type="button" class="btn small" id="comic-retry" hidden>Buscar datos otra vez</button>
+            <button type="button" class="btn small" id="comic-search" hidden><svg><use href="#i-search"/></svg>Buscar por título</button>
           </div>
         </div>
         <label class="field"><span>Título</span><input name="title" required autocomplete="off"></label>

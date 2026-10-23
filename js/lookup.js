@@ -1,11 +1,25 @@
 // Búsqueda de datos de un cómic por ISBN o por título.
-// Fuentes: Google Books (principal) y Open Library (respaldo). Ambas
-// permiten llamadas desde el navegador sin clave.
+// Fuentes: Google Books (principal) y Open Library (respaldo).
+// Google Books sin clave comparte una cuota global que suele estar agotada
+// (error 429), así que se puede configurar una clave propia en Ajustes.
 
 import { isValidEan13 } from './ean.js';
 
 const GB = 'https://www.googleapis.com/books/v1/volumes';
 const OL = 'https://openlibrary.org/api/books';
+const OL_SEARCH = 'https://openlibrary.org/search.json';
+
+let googleKey = '';
+export function setGoogleKey(k) { googleKey = (k || '').trim(); }
+const gbUrl = (params) => `${GB}?${params}${googleKey ? `&key=${encodeURIComponent(googleKey)}` : ''}`;
+
+// Traduce un fallo de Google Books a algo que se pueda explicar
+export function googleProblem(err) {
+  if (!err) return null;
+  if (err.status === 429) return googleKey ? 'quota-own' : 'quota';
+  if (err.status === 400 || err.status === 403) return googleKey ? 'badkey' : 'blocked';
+  return 'network';
+}
 
 export function normalizeIsbn(raw) {
   const s = String(raw || '').replace(/[^0-9Xx]/g, '').toUpperCase();
@@ -67,7 +81,7 @@ function mapVolume(v) {
 async function googleByIsbn(code) {
   const tries = [`q=isbn:${code}`, `q=${code}`];
   for (const q of tries) {
-    const j = await getJson(`${GB}?${q}&country=ES&maxResults=10`);
+    const j = await getJson(gbUrl(`${q}&country=ES&maxResults=10`));
     const items = j.items || [];
     const hit = items.find((v) => {
       const ids = idsOf(v.volumeInfo || {});
@@ -107,15 +121,17 @@ function probeImage(url, ms = 6000) {
   });
 }
 
-// Devuelve { status: 'ok' | 'notfound' | 'offline', data }
+// Devuelve { status: 'ok' | 'notfound' | 'offline', data, google }
+// `google` explica por qué falló Google Books (cuota, clave…), si falló.
 export async function lookupCode(code) {
   if (!navigator.onLine) return { status: 'offline' };
   const [gb, ol] = await Promise.allSettled([googleByIsbn(code), isIsbn(code) ? openLibraryByIsbn(code) : null]);
   const a = gb.status === 'fulfilled' ? gb.value : null;
   const b = ol.status === 'fulfilled' ? ol.value : null;
+  const google = gb.status === 'rejected' ? googleProblem(gb.reason) : null;
   if (!a && !b) {
-    const failed = gb.status === 'rejected' && (ol.status === 'rejected' || !isIsbn(code));
-    return { status: failed ? 'offline' : 'notfound' };
+    const failed = gb.status === 'rejected' && google === 'network' && (ol.status === 'rejected' || !isIsbn(code));
+    return { status: failed ? 'offline' : 'notfound', google };
   }
   const data = { ...(b || {}), ...(a || {}) };
   for (const k of Object.keys(b || {})) if (!data[k] && b[k]) data[k] = b[k];
@@ -124,12 +140,57 @@ export async function lookupCode(code) {
     if (await probeImage(url)) data.cover = url;
   }
   data.isbn = code;
-  return { status: 'ok', data: enrich(data) };
+  return { status: 'ok', data: enrich(data), google };
 }
 
-export async function searchTitle(q) {
-  const j = await getJson(`${GB}?q=${encodeURIComponent(q)}&langRestrict=es&printType=books&maxResults=20&country=ES`);
+async function googleSearch(q) {
+  const j = await getJson(gbUrl(`q=${encodeURIComponent(q)}&langRestrict=es&printType=books&maxResults=20&country=ES`));
   return (j.items || []).map((v) => enrich(mapVolume(v)));
+}
+
+// Open Library: se queda con las ediciones españolas (ISBN 978-84…).
+// El título puede venir en japonés; al elegirlo se busca la edición por ISBN.
+async function openLibrarySearch(q) {
+  const j = await getJson(`${OL_SEARCH}?q=${encodeURIComponent(q)}&fields=title,author_name,publisher,isbn,cover_i&limit=60`);
+  const out = [];
+  for (const d of j.docs || []) {
+    const isbns = (d.isbn || []).filter((i) => /^97[89]84\d{8}$/.test(i) && isValidEan13(i));
+    for (const isbn of isbns.slice(0, 3)) {
+      out.push(enrich({
+        title: d.title || '', subtitle: '', authors: (d.author_name || []).join(', '),
+        publisher: (d.publisher || []).find((p) => /planeta|norma|ivrea|panini|ecc|milky|arechi|distrito|kitsune|tomodomo|glénat|glenat|editores/i.test(p)) || '',
+        publishedDate: '', pages: null, categories: '', description: '', price: null,
+        cover: `https://covers.openlibrary.org/b/isbn/${isbn}-M.jpg`,
+        isbn, needsLookup: true,
+      }));
+    }
+    if (out.length >= 24) break;
+  }
+  return out;
+}
+
+// Devuelve { results, google } con los resultados de ambas fuentes
+export async function searchTitle(q) {
+  const [gb, ol] = await Promise.allSettled([googleSearch(q), openLibrarySearch(q)]);
+  const results = [];
+  const seen = new Set();
+  for (const r of [...(gb.status === 'fulfilled' ? gb.value : []), ...(ol.status === 'fulfilled' ? ol.value : [])]) {
+    const k = r.isbn || r.title;
+    if (seen.has(k)) continue;
+    seen.add(k); results.push(r);
+  }
+  if (gb.status === 'rejected' && ol.status === 'rejected') throw gb.reason;
+  return { results, google: gb.status === 'rejected' ? googleProblem(gb.reason) : null };
+}
+
+// Prueba la conexión con Google Books (para Ajustes)
+export async function testGoogle() {
+  try {
+    const j = await getJson(gbUrl('q=isbn:9788468471495&maxResults=1'));
+    return { ok: true, n: j.totalItems || 0 };
+  } catch (e) {
+    return { ok: false, problem: googleProblem(e), status: e.status || null };
+  }
 }
 
 // ---------- Interpretación del título ----------
