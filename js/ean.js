@@ -133,7 +133,7 @@ function decodeRuns(runs, firstDark) {
 
 // Convierte una línea de luminancias en anchos de barras/espacios con
 // bordes interpolados (precisión subpíxel) y umbral local.
-export function lineToRuns(v) {
+function lineToRuns(v) {
   const n = v.length;
   let gMin = 255, gMax = 0;
   for (let i = 0; i < n; i++) { if (v[i] < gMin) gMin = v[i]; if (v[i] > gMax) gMax = v[i]; }
@@ -165,7 +165,7 @@ export function lineToRuns(v) {
 
 // Alternativa: bordes en los máximos de la derivada. Funciona mejor con
 // imágenes desenfocadas, donde los espacios finos no llegan a blanco.
-export function lineToRunsGradient(v) {
+function lineToRunsGradient(v) {
   const n = v.length;
   const s = new Float32Array(n);
   s[0] = v[0]; s[n - 1] = v[n - 1];
@@ -293,6 +293,3 @@ export function scanGray(gray, w, h, { lines = 24, horizontal = true, vertical =
   return { code: best, votes: bestN, addon };
 }
 
-export function scanImageData(img, opts) {
-  return scanGray(toGray(img.data, img.width, img.height), img.width, img.height, opts);
-}

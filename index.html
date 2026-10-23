@@ -25,9 +25,7 @@
       <symbol id="i-shelf" viewBox="0 0 24 24"><path d="M4 4h3v16H4zM9 4h3v16H9zM14.2 5.1l2.9-.8 4 15.4-2.9.8z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
       <symbol id="i-series" viewBox="0 0 24 24"><path d="M3 18h18M5 18V7m3 11V5m3 13V8m3 10V6m3 12V9m3 9V7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
       <symbol id="i-barcode" viewBox="0 0 24 24"><path d="M4 5v14M7 5v14M9.5 5v14M13 5v14M15 5v14M18 5v14M20 5v14" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
-      <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.8L12 16.8l-5.2 2.8 1-5.8-4.3-4.1 5.9-.8z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
-      <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 20h16M7 20v-6m5 6V9m5 11V4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
-      <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M5.5 18.5l1.7-1.7M16.8 7.2l1.7-1.7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+      <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="4" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M4.5 20.5c1.2-3.6 4-5.5 7.5-5.5s6.3 1.9 7.5 5.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
       <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
       <symbol id="i-flash" viewBox="0 0 24 24"><path d="M13 2L5 13h6l-1 9 8-11h-6z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
       <symbol id="i-image" viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M3.5 16l5-5 4 4 3-3 5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
@@ -36,43 +34,31 @@
       <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
       <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
       <symbol id="i-camera" viewBox="0 0 24 24"><path d="M4 8h3l1.5-2h7L17 8h3v11H4z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="12" cy="13.5" r="3.3" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
-      <symbol id="i-burst" viewBox="0 0 24 24"><rect x="3" y="7" width="10" height="13" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M7 4h11.5A1.5 1.5 0 0 1 20 5.5V17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
     </defs>
   </svg>
 
   <div class="app">
     <header class="topbar">
       <h1 id="screen-title">Biblioteca</h1>
-      <div class="top-actions">
-        <button class="icon-btn" id="btn-find" aria-label="Buscar un cómic por título para añadirlo"><svg><use href="#i-search"/></svg></button>
-        <button class="icon-btn" id="btn-settings" aria-label="Ajustes y copia de seguridad"><svg><use href="#i-gear"/></svg></button>
-      </div>
     </header>
 
-    <main id="main">
-      <section class="view" id="view-library" data-title="Biblioteca">
-        <div class="toolbar">
+    <main>
+      <section class="view" id="view-library">
+        <div class="toolbar" id="lib-tools" hidden>
           <label class="search">
-            <svg><use href="#i-search"/></svg>
-            <input type="search" id="lib-search" placeholder="Buscar título, serie, editorial…" autocomplete="off">
+            <svg aria-hidden="true"><use href="#i-search"/></svg>
+            <input type="search" id="lib-search" placeholder="Buscar en tu biblioteca" autocomplete="off" aria-label="Buscar en tu biblioteca">
           </label>
-          <div class="chips" id="lib-filters" role="group" aria-label="Filtrar por lectura">
-            <button class="chip on" data-reading="">Todos</button>
-            <button class="chip" data-reading="pendiente">Pendientes</button>
-            <button class="chip" data-reading="leyendo">Leyendo</button>
-            <button class="chip" data-reading="leido">Leídos</button>
-          </div>
           <div class="toolbar-row">
-            <div class="chips" id="lib-types" role="group" aria-label="Filtrar por tipo">
-              <button class="chip on" data-type="">Todo</button>
-              <button class="chip" data-type="manga">Manga</button>
-              <button class="chip" data-type="americano">Americano</button>
+            <div class="chips" id="lib-filters" role="group" aria-label="Filtrar por lectura">
+              <button class="chip on" data-read="" aria-pressed="true">Todos</button>
+              <button class="chip" data-read="pendiente" aria-pressed="false">Sin leer</button>
+              <button class="chip" data-read="leido" aria-pressed="false">Leídos</button>
             </div>
             <select id="lib-sort" aria-label="Ordenar">
               <option value="recent">Recientes</option>
               <option value="series">Por serie</option>
               <option value="title">Por título</option>
-              <option value="publisher">Por editorial</option>
             </select>
           </div>
         </div>
@@ -80,94 +66,56 @@
         <div class="shelf" id="lib-grid"></div>
       </section>
 
-      <section class="view" id="view-series" data-title="Series" hidden>
+      <section class="view" id="view-series" hidden>
         <p class="count" id="series-count"></p>
         <div id="series-list"></div>
       </section>
 
-      <section class="view" id="view-wishlist" data-title="Lo quiero" hidden>
-        <div id="wish-summary"></div>
-        <div id="wish-list"></div>
-      </section>
+      <section class="view" id="view-profile" hidden>
+        <div class="profile-head" id="profile-head"></div>
+        <div id="profile-stats"></div>
 
-      <section class="view" id="view-stats" data-title="Estadísticas" hidden>
-        <div id="stats"></div>
-      </section>
-
-      <section class="view" id="view-settings" data-title="Ajustes" hidden>
-        <div class="panel" id="account-panel">
-          <h2>Cuenta</h2>
-          <p class="muted" id="account-off" hidden>Las cuentas todavía no están activadas en esta versión de Shiori.</p>
-          <form id="account-login" hidden novalidate>
-            <p class="muted">Con una cuenta, tu biblioteca se guarda en la nube: no se pierde si cambias de móvil o borras los datos, y se sincroniza entre tus dispositivos.</p>
-            <label class="field" style="margin-top:10px"><span>Correo</span><input type="email" id="acc-email" autocomplete="email" inputmode="email"></label>
-            <label class="field"><span>Contraseña (mínimo 6 caracteres)</span><input type="password" id="acc-pass" autocomplete="current-password"></label>
-            <div class="btn-row" style="margin-top:0">
-              <button class="btn primary" type="submit" data-act="in">Entrar</button>
-              <button class="btn" type="button" data-act="up">Crear cuenta</button>
-            </div>
-            <div class="btn-row">
-              <button class="btn small" type="button" data-act="google">Entrar con Google</button>
-              <button class="btn small" type="button" data-act="reset">He olvidado la contraseña</button>
-            </div>
-            <p class="small" id="acc-msg" aria-live="polite" style="margin-top:8px"></p>
-          </form>
-          <div id="account-in" hidden>
-            <p style="margin-top:4px">Conectado como <b id="acc-who"></b></p>
-            <p class="muted small" id="sync-status" aria-live="polite"></p>
-            <div class="btn-row"><button class="btn small" id="acc-out">Cerrar sesión</button></div>
-          </div>
+        <h2 class="section-title">Ajustes</h2>
+        <div class="panel">
+          <label class="switch-row">
+            <span><b>Añadir automáticamente</b><small>Si el cómic se reconoce al escanear, se guarda sin abrir la ficha.</small></span>
+            <input type="checkbox" id="auto-add" role="switch">
+          </label>
         </div>
         <div class="panel">
-          <h2>Copia de seguridad</h2>
-          <p class="muted">Tu biblioteca vive en este móvil. Guarda una copia de vez en cuando para no perderla si cambias de teléfono o borras los datos del navegador.</p>
+          <h3>Copia de seguridad</h3>
+          <p class="muted small">Un archivo con toda tu biblioteca, por si cambias de móvil sin tener cuenta.</p>
           <div class="btn-row">
-            <button class="btn primary" id="btn-export">Descargar copia</button>
-            <button class="btn" id="btn-share" hidden>Compartir copia</button>
-          </div>
-          <div class="btn-row">
-            <label class="btn">Importar copia<input type="file" id="import-file" accept="application/json,.json" hidden></label>
+            <button class="btn small" id="btn-export">Descargar copia</button>
+            <label class="btn small">Importar copia<input type="file" id="import-file" accept="application/json,.json" hidden></label>
           </div>
           <p class="muted small" id="last-backup"></p>
         </div>
-        <div class="panel">
-          <h2>Almacenamiento</h2>
-          <p class="muted" id="storage-info">Comprobando…</p>
-        </div>
-        <div class="panel">
-          <h2>Al escanear</h2>
-          <label class="check"><input type="checkbox" id="auto-add" checked>Añadir automáticamente si se encuentra</label>
-          <p class="muted small">Se guarda sin abrir la ficha y la cámara sigue lista para el siguiente. Si no se encuentra, se abre la ficha para completarlo.</p>
-        </div>
-        <div class="panel">
-          <h2>Clave de Google Books</h2>
-          <p class="muted">Sin clave, Shiori usa la cuota gratuita que comparte todo el mundo y casi siempre está agotada. Con una clave tuya (gratis) tienes 1.000 búsquedas al día solo para ti. Se guarda únicamente en este dispositivo.</p>
-          <label class="field" style="margin-top:10px"><span>Clave (empieza por AIza…)</span><input id="google-key" autocomplete="off" spellcheck="false" placeholder="AIza…"></label>
+        <details class="panel">
+          <summary>Clave de Google Books</summary>
+          <p class="muted small">Opcional. Con una clave tuya (gratis) Google Books encuentra más cómics. Se guarda solo en este dispositivo. Cómo conseguirla: README del proyecto.</p>
+          <label class="field"><span>Clave (empieza por AIza…)</span><input id="google-key" autocomplete="off" spellcheck="false" placeholder="AIza…"></label>
           <div class="btn-row" style="margin-top:0">
             <button class="btn primary small" id="google-save">Guardar y probar</button>
             <button class="btn small" id="google-test">Probar conexión</button>
           </div>
-          <p class="small" id="google-status" aria-live="polite" style="margin-top:8px"></p>
-        </div>
+          <p class="small" id="google-status" aria-live="polite"></p>
+        </details>
         <div class="panel">
-          <h2>De dónde salen los datos</h2>
-          <p class="muted">Al escanear, Shiori busca el ISBN en Google Books, en Open Library y en la base de datos de libros editados en España (Ministerio de Cultura). Si un tomo no aparece o le falta la portada, puedes completarlo a mano y hacerle una foto: se queda guardado en tu biblioteca.</p>
+          <h3>Borrar este dispositivo</h3>
+          <p class="muted small">Quita tus cómics de este móvil. Si tienes cuenta, siguen guardados en ella.</p>
+          <div class="btn-row"><button class="btn small danger" id="btn-wipe">Borrar datos de este dispositivo</button></div>
         </div>
-        <div class="panel danger">
-          <h2>Borrar todo</h2>
-          <p class="muted">Elimina todos los cómics y series de este dispositivo.</p>
-          <button class="btn danger" id="btn-wipe">Borrar biblioteca</button>
-        </div>
-        <p class="muted small center">Shiori 1.0</p>
+        <p class="muted small center about">Shiori 2.0 · Datos de Panini, Google Books y Open Library</p>
       </section>
     </main>
 
     <nav class="tabbar" aria-label="Secciones">
-      <button class="tab on" data-view="library"><svg><use href="#i-shelf"/></svg><span>Biblioteca</span></button>
-      <button class="tab" data-view="series"><svg><use href="#i-series"/></svg><span>Series</span></button>
-      <button class="scan-ribbon" id="btn-scan" aria-label="Escanear código de barras"><svg><use href="#i-barcode"/></svg><span>Escanear</span></button>
-      <button class="tab" data-view="wishlist"><svg><use href="#i-star"/></svg><span>Lo quiero</span></button>
-      <button class="tab" data-view="stats"><svg><use href="#i-chart"/></svg><span>Datos</span></button>
+      <button class="tab on" data-view="library" aria-current="page"><svg aria-hidden="true"><use href="#i-shelf"/></svg><span>Biblioteca</span></button>
+      <button class="tab" data-view="series"><svg aria-hidden="true"><use href="#i-series"/></svg><span>Series</span></button>
+      <button class="scan-ribbon" id="btn-scan" aria-label="Escanear código de barras"><svg aria-hidden="true"><use href="#i-barcode"/></svg><span>Escanear</span></button>
+      <button class="tab" id="btn-add"><svg aria-hidden="true"><use href="#i-plus"/></svg><span>Añadir</span></button>
+      <button class="tab" data-view="profile"><svg aria-hidden="true"><use href="#i-user"/></svg><span>Perfil</span></button>
     </nav>
   </div>
 
@@ -177,34 +125,38 @@
     <div class="scan-frame" aria-hidden="true"><i></i></div>
     <div class="scan-top">
       <button class="round" id="scan-close" aria-label="Cerrar escáner"><svg><use href="#i-close"/></svg></button>
-      <div class="scan-modes" role="group" aria-label="Al escanear">
-        <button class="on" data-dest="coleccion">Lo tengo</button>
-        <button data-dest="deseo">Lo quiero</button>
-      </div>
       <button class="round" id="scan-torch" aria-label="Linterna" hidden><svg><use href="#i-flash"/></svg></button>
     </div>
-    <p class="scan-status" id="scan-status" aria-live="polite">Apunta al código de barras de la contraportada</p>
+    <p class="scan-status" id="scan-status" aria-live="polite"></p>
+    <div class="scan-log" id="scan-log" aria-live="polite"></div>
     <div class="scan-bottom">
-      <button class="tool" id="scan-burst" aria-pressed="false"><svg><use href="#i-burst"/></svg><span>Ráfaga</span></button>
-      <button class="tool" id="scan-manual"><svg><use href="#i-keys"/></svg><span>Escribir ISBN</span></button>
-      <label class="tool"><svg><use href="#i-image"/></svg><span>Desde foto</span><input type="file" id="scan-photo" accept="image/*" hidden></label>
-      <button class="tool" id="scan-title"><svg><use href="#i-search"/></svg><span>Por título</span></button>
+      <button class="tool" id="scan-type"><svg><use href="#i-keys"/></svg><span>Escribir código</span></button>
+      <label class="tool"><svg><use href="#i-image"/></svg><span>Desde una foto</span><input type="file" id="scan-photo" accept="image/*" hidden></label>
     </div>
-    <div class="burst-log" id="burst-log"></div>
   </div>
 
-  <!-- Ficha de cómic -->
-  <dialog class="sheet" id="sheet-comic">
+  <!-- Ficha del cómic -->
+  <dialog class="sheet" id="sheet-detail" aria-labelledby="detail-heading">
+    <div class="sheet-head">
+      <button type="button" class="icon-btn" data-close aria-label="Cerrar"><svg><use href="#i-close"/></svg></button>
+      <h2 id="detail-heading"></h2>
+      <span></span>
+    </div>
+    <div class="sheet-body" id="detail-body"></div>
+  </dialog>
+
+  <!-- Añadir / editar -->
+  <dialog class="sheet" id="sheet-comic" aria-labelledby="comic-heading">
     <form method="dialog" id="comic-form" novalidate>
       <div class="sheet-head">
         <button type="button" class="icon-btn" data-close aria-label="Cerrar"><svg><use href="#i-close"/></svg></button>
-        <h2 id="comic-heading">Nuevo cómic</h2>
+        <h2 id="comic-heading">Añadir cómic</h2>
         <button type="submit" class="btn primary small" id="comic-save">Guardar</button>
       </div>
       <div class="sheet-body">
         <p class="notice" id="comic-notice" hidden></p>
         <div class="comic-top">
-          <div class="cover-edit" id="comic-cover"></div>
+          <div id="comic-cover"></div>
           <div class="cover-actions">
             <label class="btn small"><svg><use href="#i-camera"/></svg>Foto de portada<input type="file" id="cover-photo" accept="image/*" capture="environment" hidden></label>
             <button type="button" class="btn small" id="cover-remove">Quitar portada</button>
@@ -212,38 +164,15 @@
             <button type="button" class="btn small" id="comic-search" hidden><svg><use href="#i-search"/></svg>Buscar por título</button>
           </div>
         </div>
-        <label class="field"><span>Título</span><input name="title" required autocomplete="off"></label>
+        <label class="field"><span>Título</span><input name="title" autocomplete="off"></label>
         <div class="field-row">
           <label class="field grow"><span>Serie</span><input name="series" list="series-options" autocomplete="off"></label>
           <label class="field num"><span>Número</span><input name="number" inputmode="numeric" autocomplete="off"></label>
         </div>
         <datalist id="series-options"></datalist>
-        <div class="field">
-          <span>Dónde va</span>
-          <div class="seg" data-name="status">
-            <button type="button" data-v="coleccion">Lo tengo</button>
-            <button type="button" data-v="deseo">Lo quiero</button>
-          </div>
-        </div>
-        <div class="field" data-only="coleccion">
-          <span>Lectura</span>
-          <div class="seg" data-name="reading">
-            <button type="button" data-v="pendiente">Pendiente</button>
-            <button type="button" data-v="leyendo">Leyendo</button>
-            <button type="button" data-v="leido">Leído</button>
-          </div>
-        </div>
-        <div class="field">
-          <span>Tipo</span>
-          <div class="seg" data-name="type">
-            <button type="button" data-v="manga">Manga</button>
-            <button type="button" data-v="americano">Americano</button>
-            <button type="button" data-v="otro">Otro</button>
-          </div>
-        </div>
         <div class="field-row">
           <label class="field grow"><span>Precio (€)</span><input name="price" inputmode="decimal" placeholder="9,50" autocomplete="off"></label>
-          <label class="field grow" data-only="coleccion"><span>Fecha de compra</span><input name="purchaseDate" type="date"></label>
+          <label class="field grow"><span>Fecha de compra</span><input name="purchaseDate" type="date"></label>
         </div>
         <label class="field"><span>Editorial</span><input name="publisher" list="publisher-options" autocomplete="off"></label>
         <datalist id="publisher-options"></datalist>
@@ -254,13 +183,12 @@
           <label class="field num"><span>Páginas</span><input name="pages" inputmode="numeric" autocomplete="off"></label>
         </div>
         <label class="field"><span>Notas</span><textarea name="notes" rows="3" placeholder="Edición, estado, dónde lo compraste…"></textarea></label>
-        <button type="button" class="btn danger wide" id="comic-delete" hidden>Eliminar de Shiori</button>
       </div>
     </form>
   </dialog>
 
   <!-- Serie -->
-  <dialog class="sheet" id="sheet-series">
+  <dialog class="sheet" id="sheet-series" aria-labelledby="series-heading">
     <div class="sheet-head">
       <button type="button" class="icon-btn" data-close aria-label="Cerrar"><svg><use href="#i-close"/></svg></button>
       <h2 id="series-heading"></h2>
@@ -269,31 +197,72 @@
     <div class="sheet-body" id="series-body"></div>
   </dialog>
 
-  <!-- ISBN a mano / búsqueda por título -->
-  <dialog class="sheet" id="sheet-find">
+  <!-- Añadir sin escanear -->
+  <dialog class="sheet" id="sheet-add" aria-labelledby="add-heading">
     <div class="sheet-head">
       <button type="button" class="icon-btn" data-close aria-label="Cerrar"><svg><use href="#i-close"/></svg></button>
-      <h2 id="find-heading">Buscar</h2>
+      <h2 id="add-heading">Añadir un cómic</h2>
       <span></span>
     </div>
     <div class="sheet-body">
-      <form id="find-form" class="find-form">
-        <input id="find-input" autocomplete="off" enterkeyhint="search">
+      <form id="add-form" class="find-form">
+        <input id="add-input" autocomplete="off" enterkeyhint="search" placeholder="Título, ISBN o ISSN" aria-label="Título, ISBN o ISSN">
         <button class="btn primary" type="submit">Buscar</button>
       </form>
-      <p class="muted small" id="find-hint"></p>
-      <div id="find-results"></div>
+      <p class="muted small" id="add-hint"></p>
+      <label class="btn small photo-btn"><svg><use href="#i-image"/></svg>Leer el código desde una foto<input type="file" id="add-photo" accept="image/*" hidden></label>
+      <div id="add-results"></div>
     </div>
   </dialog>
 
-  <!-- Elegir número de una serie del catálogo -->
-  <dialog class="sheet" id="sheet-pick">
+  <!-- Elegir número por portada -->
+  <dialog class="sheet" id="sheet-pick" aria-labelledby="pick-heading">
     <div class="sheet-head">
       <button type="button" class="icon-btn" data-close aria-label="Cerrar"><svg><use href="#i-close"/></svg></button>
       <h2 id="pick-heading"></h2>
       <span></span>
     </div>
     <div class="sheet-body" id="pick-body"></div>
+  </dialog>
+
+  <!-- Cuenta -->
+  <dialog class="sheet" id="sheet-account" aria-labelledby="account-heading">
+    <div class="sheet-head">
+      <button type="button" class="icon-btn" data-close aria-label="Cerrar"><svg><use href="#i-close"/></svg></button>
+      <h2 id="account-heading">Cuenta</h2>
+      <span></span>
+    </div>
+    <div class="sheet-body">
+      <form id="account-login" novalidate>
+        <p class="muted">Con una cuenta tus cómics se guardan en la nube: no se pierden si cambias de móvil y se sincronizan entre tus dispositivos.</p>
+        <label class="field"><span>Correo</span><input type="email" id="acc-email" autocomplete="email" inputmode="email"></label>
+        <label class="field"><span>Contraseña (mínimo 6 caracteres)</span><input type="password" id="acc-pass" autocomplete="current-password"></label>
+        <div class="btn-row">
+          <button class="btn primary" type="submit" data-act="in">Entrar</button>
+          <button class="btn" type="button" data-act="up">Crear cuenta</button>
+        </div>
+        <div class="btn-row">
+          <button class="btn small" type="button" data-act="google">Entrar con Google</button>
+          <button class="btn small" type="button" data-act="reset">He olvidado la contraseña</button>
+        </div>
+        <p class="small acc-msg" id="acc-msg" aria-live="polite"></p>
+      </form>
+      <div id="account-in" hidden>
+        <p>Conectado como <b id="acc-who"></b></p>
+        <p class="muted small" id="sync-status" aria-live="polite"></p>
+        <div class="btn-row"><button class="btn small" id="acc-out">Cerrar sesión</button></div>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Confirmación -->
+  <dialog class="sheet confirm" id="sheet-confirm" aria-labelledby="confirm-title">
+    <div class="sheet-body">
+      <h2 id="confirm-title"></h2>
+      <p id="confirm-text" class="muted"></p>
+      <button class="btn wide primary" id="confirm-ok"></button>
+      <button class="btn wide" data-close>Cancelar</button>
+    </div>
   </dialog>
 
   <div class="toast" id="toast" role="status" aria-live="polite" hidden><span id="toast-text"></span><button id="toast-action" hidden></button></div>

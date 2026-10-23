@@ -12,7 +12,6 @@ const OL_SEARCH = 'https://openlibrary.org/search.json';
 
 let googleKey = '';
 const ministryUrl = MINISTRY_URL.replace(/\/$/, '');
-export const hasMinistry = !!ministryUrl;
 export function setGoogleKey(k) { googleKey = (k || '').trim(); }
 const gbUrl = (params) => `${GB}?${params}${googleKey ? `&key=${encodeURIComponent(googleKey)}` : ''}`;
 

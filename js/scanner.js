@@ -3,6 +3,29 @@
 
 import { scanGray, toGray, isValidEan13 } from './ean.js';
 
+// Decodificador en un Web Worker (si el navegador lo permite); si no, en el hilo principal
+let worker = null;
+let seq = 0;
+const waiting = new Map();
+function getWorker() {
+  if (worker !== null) return worker;
+  try {
+    worker = new Worker(new URL('./decoder-worker.js', import.meta.url), { type: 'module' });
+    worker.onmessage = (e) => { const r = waiting.get(e.data.id); waiting.delete(e.data.id); r?.(e.data.result); };
+    worker.onerror = () => { worker = false; waiting.forEach((r) => r(null)); waiting.clear(); };
+  } catch { worker = false; }
+  return worker;
+}
+function decode(img, w, h, opts) {
+  const wk = getWorker();
+  if (!wk) return Promise.resolve(scanGray(toGray(img.data, w, h), w, h, opts));
+  return new Promise((resolve) => {
+    const id = ++seq;
+    waiting.set(id, resolve);
+    wk.postMessage({ id, data: img.data, w, h, opts }, [img.data.buffer]);
+  });
+}
+
 async function nativeDetector() {
   if (!('BarcodeDetector' in window)) return null;
   try {
@@ -80,8 +103,8 @@ export class Scanner {
     const t0 = performance.now();
     try {
       if (!this.paused && this.video.readyState >= 2) {
-        let hit = this.native ? await this.detectNative() : this.detectOwn();
-        if (hit) hit = this.withAddon(hit);
+        let hit = this.native ? await this.detectNative() : await this.detectOwn();
+        if (hit) hit = await this.withAddon(hit);
         if (hit && !this.paused) this.onCode(hit.code, hit.addon);
       }
     } catch (e) {
@@ -103,9 +126,9 @@ export class Scanner {
   // Las revistas (código 977…, ISSN) llevan el número en un suplemento de
   // 2 o 5 cifras. El lector nativo no lo da, así que se busca con el propio
   // durante un momento antes de dar el código por bueno.
-  withAddon(hit) {
+  async withAddon(hit) {
     if (!hit.code.startsWith('977') || hit.addon) { this.pendingAddon = null; return hit; }
-    const extra = this.native ? this.ownScan(false, 30) : null;
+    const extra = this.native ? await this.ownScan(false, 30) : null;
     if (extra?.code === hit.code && extra.addon) { this.pendingAddon = null; return { code: hit.code, addon: extra.addon }; }
     const now = performance.now();
     if (this.pendingAddon?.code !== hit.code) this.pendingAddon = { code: hit.code, since: now };
@@ -114,11 +137,11 @@ export class Scanner {
     return hit;
   }
 
-  detectOwn() {
+  async detectOwn() {
     if (!this.video.videoWidth) return null;
     this.frame++;
     const vertical = this.frame % 3 === 0; // de vez en cuando, código en vertical
-    const r = this.ownScan(vertical, 18);
+    const r = await this.ownScan(vertical, 18);
     if (!r) return null;
     // Confirmación: dos líneas coinciden en el mismo fotograma o en dos seguidos
     if (r.votes >= 2 || this.last?.code === r.code) {
@@ -130,7 +153,7 @@ export class Scanner {
     return null;
   }
 
-  ownScan(vertical, lines) {
+  async ownScan(vertical, lines) {
     const vw = this.video.videoWidth, vh = this.video.videoHeight;
     if (!vw || !vh) return null;
     let sx, sy, sw, sh;
@@ -141,7 +164,7 @@ export class Scanner {
     this.canvas.width = w; this.canvas.height = h;
     this.ctx.drawImage(this.video, sx, sy, sw, sh, 0, 0, w, h);
     const img = this.ctx.getImageData(0, 0, w, h);
-    return scanGray(toGray(img.data, w, h), w, h, { lines, horizontal: !vertical, vertical });
+    return decode(img, w, h, { lines, horizontal: !vertical, vertical });
   }
 }
 

@@ -1,0 +1,226 @@
+"""Prueba de extremo a extremo de Shiori con un Chromium móvil simulado.
+
+Recorre lo esencial: escanear con la cámara (simulada) una grapa y un tomo, ver la
+biblioteca, abrir la ficha y marcar como leído, las series con lo que falta y su precio,
+el perfil con estadísticas, la copia de seguridad, borrar el dispositivo y las cuentas
+con una nube simulada (sin mezclar colecciones al cambiar de cuenta).
+
+Uso:  pip install playwright pillow && playwright install chromium
+      python3 tests/e2e_test.py
+"""
+import asyncio, functools, http.server, io, json, os, re, socketserver, sys, tempfile, threading
+from PIL import Image, ImageDraw, ImageFilter
+from playwright.async_api import async_playwright
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+TESTS = os.path.dirname(os.path.abspath(__file__))
+TMP = tempfile.mkdtemp(prefix='shiori-e2e-')
+FAILS = []
+
+def check(cond, msg):
+    print(('  ok  ' if cond else '  FALLO ') + msg)
+    if not cond: FAILS.append(msg)
+
+# ---------- Servidor local ----------
+class Quiet(http.server.SimpleHTTPRequestHandler):
+    def log_message(self, *a): pass
+def serve():
+    httpd = socketserver.TCPServer(('127.0.0.1', 0), functools.partial(Quiet, directory=ROOT))
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    return httpd, f'http://localhost:{httpd.server_address[1]}/'
+
+# ---------- Vídeo de cámara con un código de barras ----------
+L = ['0001101','0011001','0010011','0111101','0100011','0110001','0101111','0111011','0110111','0001011']
+R = [''.join('1' if c == '0' else '0' for c in p) for p in L]; G = [p[::-1] for p in R]
+PAR = ['LLLLLL','LLGLGG','LLGGLG','LLGGGL','LGLLGG','LGGLLG','LGGGLL','LGLGLG','LGLGGL','LGGLGL']
+P5 = ['GGLLL','GLGLL','GLLGL','GLLLG','LGGLL','LLGGL','LLLGG','LGLGL','LGLLG','LLGLG']
+def ean_bits(code):
+    b = '101'
+    for i, d in enumerate(code[1:7]): b += (L if PAR[int(code[0])][i] == 'L' else G)[int(d)]
+    b += '01010'
+    for d in code[7:]: b += R[int(d)]
+    return b + '101'
+def addon_bits(a):
+    if len(a) == 2: par = ['LL','LG','GL','GG'][int(a) % 4]
+    else:
+        d = list(map(int, a)); par = P5[(3*(d[0]+d[2]+d[4]) + 9*(d[1]+d[3])) % 10]
+    b = '1011'
+    for i, c in enumerate(a):
+        b += (L if par[i] == 'L' else G)[int(c)]
+        if i < len(a) - 1: b += '01'
+    return b
+def camera(code, addon=None):
+    bits = ean_bits(code) + ('0' * 9 + addon_bits(addon) if addon else '')
+    W, H, mod = 640, 480, 2.2
+    img = Image.new('RGB', (W, H), (40, 40, 70)); d = ImageDraw.Draw(img)
+    bw = len(bits) * mod; x0 = (W - bw) / 2
+    d.rectangle([x0 - 25, 140, x0 + bw + 25, 340], fill=(250, 250, 248))
+    i = 0
+    while i < len(bits):
+        if bits[i] == '1':
+            j = i
+            while j < len(bits) and bits[j] == '1': j += 1
+            d.rectangle([x0 + i*mod, 160 if i < 95 else 185, x0 + j*mod - 1, 310], fill=(20, 20, 20)); i = j
+        else: i += 1
+    img = img.rotate(-2, resample=Image.BILINEAR).filter(ImageFilter.GaussianBlur(0.6))
+    Y, Cb, Cr = img.convert('YCbCr').split(); Cb = Cb.resize((W//2, H//2)); Cr = Cr.resize((W//2, H//2))
+    path = os.path.join(TMP, f'{code}-{addon or ""}.y4m')
+    with open(path, 'wb') as f:
+        f.write(f'YUV4MPEG2 W{W} H{H} F15:1 Ip A1:1 C420jpeg\n'.encode())
+        for _ in range(30): f.write(b'FRAME\n' + Y.tobytes() + Cb.tobytes() + Cr.tobytes())
+    return path
+
+# ---------- Red simulada ----------
+def ean13(c12):
+    s = sum(int(d) * (3 if i % 2 else 1) for i, d in enumerate(c12)); return c12 + str((10 - s % 10) % 10)
+CHAINSAW = {ean13('978846794%03d' % n): (f'Chainsaw Man {n}', 8.5) for n in range(1, 6)}
+async def google(route):
+    m = re.search(r'isbn:(\d{13})', route.request.url); items = []
+    if m and m.group(1) in CHAINSAW:
+        t, p = CHAINSAW[m.group(1)]
+        items = [{'volumeInfo': {'title': t, 'publisher': 'Norma Editorial', 'authors': ['Tatsuki Fujimoto'],
+                  'industryIdentifiers': [{'type': 'ISBN_13', 'identifier': m.group(1)}]},
+                  'saleInfo': {'listPrice': {'amount': p, 'currencyCode': 'EUR'}}}]
+    await route.fulfill(status=200, content_type='application/json', headers={'access-control-allow-origin': '*'},
+                        body=json.dumps({'items': items} if items else {'totalItems': 0}))
+def jpeg():
+    b = io.BytesIO(); Image.new('RGB', (64, 96), (200, 60, 60)).save(b, 'JPEG'); return b.getvalue()
+JPEG = jpeg()
+CONFIG = open(os.path.join(ROOT, 'js/config.js')).read().replace(
+    'export const FIREBASE_CONFIG = null;', "export const FIREBASE_CONFIG = { apiKey: 'test', projectId: 'test' };")
+
+async def new_page(browser, base, video=None, cloud=False):
+    args = {'viewport': {'width': 390, 'height': 844}, 'is_mobile': True, 'has_touch': True, 'service_workers': 'block'}
+    if video: args['permissions'] = ['camera']
+    ctx = await browser.new_context(**args)
+    pg = await ctx.new_page()
+    pg.errors = []
+    pg.on('pageerror', lambda e: pg.errors.append(str(e)))
+    await pg.route('https://www.googleapis.com/**', google)
+    await pg.route('https://openlibrary.org/**', lambda r: asyncio.ensure_future(r.fulfill(status=200, content_type='application/json', headers={'access-control-allow-origin': '*'}, body='{}')))
+    await pg.route('https://covers.openlibrary.org/**', lambda r: asyncio.ensure_future(r.fulfill(status=404, body='')))
+    await pg.route('https://www.panini.es/**', lambda r: asyncio.ensure_future(r.fulfill(status=200, content_type='image/jpeg', body=JPEG)))
+    await pg.route('https://fonts.googleapis.com/**', lambda r: asyncio.ensure_future(r.fulfill(status=200, content_type='text/css', body='')))
+    if cloud:
+        await pg.route('**/js/config.js', lambda r: asyncio.ensure_future(r.fulfill(status=200, content_type='text/javascript', body=CONFIG)))
+        async def fake(route):
+            name = route.request.url.split('/')[-1]
+            await route.fulfill(status=200, content_type='text/javascript', headers={'access-control-allow-origin': '*'},
+                                body=open(os.path.join(TESTS, 'fakefb', name)).read())
+        await pg.route('https://www.gstatic.com/firebasejs/**', fake)
+    await pg.goto(base + '?debug'); await pg.wait_for_timeout(700)
+    return ctx, pg
+
+async def scan_with_camera(p, base, code, addon=None):
+    br = await p.chromium.launch(args=['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream',
+                                       f'--use-file-for-fake-video-capture={camera(code, addon)}'])
+    return br
+
+async def main():
+    httpd, base = serve()
+    async with async_playwright() as p:
+        print('Escanear con la cámara')
+        br = await scan_with_camera(p, base, '9773081600001', '00012')
+        ctx, pg = await new_page(br, base, video=True)
+        await pg.click('#btn-scan'); await pg.wait_for_timeout(5000)
+        comics = await pg.evaluate('JSON.stringify(shiori.state.comics.map(c => [c.title, c.number, c.price, !!c.cover]))')
+        check('Absolute Martian Manhunter 12' in comics and '4.6' in comics, f'grapa leída por cámara y añadida sola: {comics}')
+        check('Añadido' in await pg.inner_text('#scan-log'), 'aviso de añadido en el escáner')
+        check(not pg.errors, f'sin errores ({pg.errors})')
+        await br.close()
+
+        br = await p.chromium.launch()
+        ctx, pg = await new_page(br, base)
+        print('Añadir y biblioteca')
+        for n in [1, 2, 3, 5]: await pg.evaluate(f"shiori.handleCode('9773081600001', {{addon: '{n:05d}'}})"); await pg.wait_for_timeout(150)
+        for code in list(CHAINSAW)[:2]: await pg.evaluate(f"shiori.handleCode('{code}')"); await pg.wait_for_timeout(200)
+        await pg.wait_for_timeout(400)
+        check(await pg.locator('.book').count() == 6, 'seis cómics en la biblioteca')
+        check('Añadido' in (await pg.text_content('#toast-text')), 'aviso «Añadido» con Deshacer')
+        await pg.evaluate("shiori.handleCode('9773081600001', {addon: '00001'})"); await pg.wait_for_timeout(300)
+        check(await pg.evaluate("document.querySelector('#sheet-detail').open") and 'Ya lo tienes' in await pg.text_content('#toast-text'), 'repetido: abre su ficha y avisa')
+        await pg.keyboard.press('Escape'); await pg.wait_for_timeout(300)
+        await pg.evaluate("shiori.handleCode('9788499999990')"); await pg.wait_for_timeout(500)
+        check(await pg.evaluate("document.querySelector('#sheet-comic').open"), 'no encontrado: abre la ficha para completarlo')
+        await pg.keyboard.press('Escape'); await pg.wait_for_timeout(300)
+
+        print('Ficha y leído')
+        await pg.click('.book:has-text("Martian Manhunter 2")'); await pg.wait_for_selector('#sheet-detail[open]')
+        body = await pg.inner_text('#detail-body')
+        check('Panini' in body and '3,30' in body and '3081-6009' in body, 'la ficha muestra editorial, precio e ISSN')
+        await pg.click('#detail-read'); await pg.wait_for_timeout(200)
+        check(await pg.get_attribute('#detail-read', 'aria-pressed') == 'true', 'botón «Marcar como leído» funciona')
+        await pg.keyboard.press('Escape'); await pg.wait_for_timeout(300)
+        check(await pg.locator('.book:has-text("Martian Manhunter 2") .mark-read').count() == 1, 'la portada lleva la marca de leído')
+        await pg.click('#lib-filters [data-read="leido"]'); await pg.wait_for_timeout(250)
+        check(await pg.locator('.book').count() == 1, 'filtro «Leídos»')
+        await pg.click('#lib-filters [data-read=""]'); await pg.wait_for_timeout(250)
+
+        print('Series')
+        await pg.click('.tab[data-view=series]'); await pg.wait_for_timeout(300)
+        card = await pg.inner_text('.series-card:has-text("Martian")')
+        # publicados 1–11 (el 12 es preventa); tiene 1, 2, 3, 5 → faltan 4, 6–11 = 7, a 3,30 € = 23,10 €
+        check('te faltan 7' in card and '23,10' in card, f'faltan y precio para completarla: {card!r}')
+        await pg.click('.series-card:has-text("Martian")'); await pg.wait_for_selector('#sheet-series[open]')
+        check(await pg.locator('.vol.miss').count() == 7 and await pg.locator('.vol.own').count() == 4, 'la hoja de la serie marca tenidos y faltantes')
+        await pg.click('.vol.miss >> nth=0'); await pg.wait_for_selector('#sheet-confirm[open]'); await pg.click('#confirm-ok'); await pg.wait_for_timeout(400)
+        check(await pg.locator('.vol.miss').count() == 6, 'añadir un número que falta desde la serie')
+        await pg.keyboard.press('Escape'); await pg.wait_for_timeout(300)
+
+        print('ISSN escrito y selector por portada')
+        await pg.click('#btn-add'); await pg.fill('#add-input', '3081-2860'); await pg.press('#add-input', 'Enter')
+        await pg.wait_for_selector('#sheet-pick[open]'); await pg.click('.pick[data-n="7"]'); await pg.wait_for_timeout(400)
+        check(await pg.evaluate("shiori.state.comics.some(c => c.title === 'Absolute Batman 7')"), 'ISSN → elegir número → añadido')
+
+        print('Perfil')
+        await pg.click('.tab[data-view=profile]'); await pg.wait_for_timeout(300)
+        kpis = await pg.inner_text('.kpis')
+        check('8' in kpis and 'invertido' in kpis and 'para completar' in kpis, f'estadísticas: {kpis!r}')
+        check(not await pg.locator('#open-account').count(), 'sin Firebase configurado no ofrece cuenta')
+
+        print('Copia de seguridad')
+        async with pg.expect_download() as dl: await pg.click('#btn-export')
+        data = json.load(open(await (await dl.value).path()))
+        check(len(data['comics']) == 8, 'la copia tiene los 8 cómics')
+        older = json.loads(json.dumps(data))
+        for c in older['comics']: c['reading'] = 'pendiente'; c['updatedAt'] = 1
+        older_path = os.path.join(TMP, 'vieja.json'); json.dump(older, open(older_path, 'w'))
+        await pg.set_input_files('#import-file', older_path); await pg.wait_for_selector('#sheet-confirm[open]'); await pg.click('#confirm-ok'); await pg.wait_for_timeout(400)
+        check(await pg.evaluate("shiori.state.comics.filter(c => c.reading === 'leido').length") == 1, 'una copia vieja no deshace cambios nuevos')
+        await pg.click('#btn-wipe'); await pg.wait_for_selector('#sheet-confirm[open]'); await pg.click('#confirm-ok'); await pg.wait_for_timeout(400)
+        check(await pg.evaluate('shiori.state.comics.length') == 0, 'borrar este dispositivo')
+        await pg.set_input_files('#import-file', older_path.replace('vieja', 'vieja')); await pg.wait_for_selector('#sheet-confirm[open]'); await pg.click('#confirm-ok'); await pg.wait_for_timeout(400)
+        check(await pg.evaluate('shiori.state.comics.length') == 8, 'importar una copia en un dispositivo vacío')
+        check(not pg.errors, f'sin errores ({pg.errors})')
+        await ctx.close()
+
+        print('Cuentas (nube simulada)')
+        ctx, pg = await new_page(br, base, cloud=True)
+        for n in [1, 2]: await pg.evaluate(f"shiori.handleCode('9773081600001', {{addon: '{n:05d}'}})"); await pg.wait_for_timeout(150)
+        await pg.click('.tab[data-view=profile]'); await pg.click('#open-account'); await pg.wait_for_selector('#sheet-account[open]')
+        await pg.fill('#acc-email', 'a@test.es'); await pg.fill('#acc-pass', '123'); await pg.click('[data-act="up"]'); await pg.wait_for_timeout(300)
+        check('6 caracteres' in await pg.text_content('#acc-msg'), 'contraseña corta rechazada')
+        await pg.fill('#acc-pass', 'secreta1'); await pg.click('[data-act="up"]'); await pg.wait_for_timeout(1200)
+        cloud = await pg.evaluate("Object.keys(JSON.parse(localStorage.getItem('fakecloud') || '{}')).filter(k => k.includes('/comics/')).length")
+        check(cloud == 2, f'al crear la cuenta se suben los cómics ({cloud})')
+        await pg.click('#btn-wipe'); await pg.wait_for_selector('#sheet-confirm[open]'); await pg.click('#confirm-ok'); await pg.wait_for_timeout(500)
+        cloud2 = await pg.evaluate("Object.values(JSON.parse(localStorage.getItem('fakecloud'))).filter(v => !v.deleted).length")
+        check(cloud2 == 2, 'borrar el dispositivo NO borra la nube')
+        await pg.click('#open-account'); await pg.wait_for_selector('#sheet-account[open]')
+        await pg.fill('#acc-email', 'b@test.es'); await pg.fill('#acc-pass', 'secreta2'); await pg.click('[data-act="up"]'); await pg.wait_for_timeout(1000)
+        await pg.evaluate("shiori.handleCode('9773081286007', {addon: '00001'})"); await pg.wait_for_timeout(400)
+        await pg.click('#open-account'); await pg.wait_for_selector('#sheet-account[open]'); await pg.click('#acc-out'); await pg.wait_for_timeout(300)
+        await pg.click('#open-account'); await pg.wait_for_selector('#sheet-account[open]')
+        await pg.fill('#acc-email', 'a@test.es'); await pg.fill('#acc-pass', 'secreta1'); await pg.click('[data-act="in"]'); await pg.wait_for_timeout(1200)
+        titles = await pg.evaluate("JSON.stringify(shiori.state.comics.map(c => c.title).sort())")
+        check(titles == json.dumps(['Absolute Martian Manhunter 1', 'Absolute Martian Manhunter 2']).replace(' ', '') or titles == '["Absolute Martian Manhunter 1","Absolute Martian Manhunter 2"]',
+              f'al entrar con otra cuenta no se mezclan colecciones: {titles}')
+        a_cloud = await pg.evaluate("Object.entries(JSON.parse(localStorage.getItem('fakecloud'))).filter(([k, v]) => k.startsWith('users/u_atestes/') && !v.deleted).length")
+        check(a_cloud == 2, 'la cuenta A sigue con sus 2 cómics')
+        check(not pg.errors, f'sin errores ({pg.errors})')
+        await br.close()
+    httpd.shutdown()
+    print(f'\n{"TODO BIEN" if not FAILS else f"{len(FAILS)} FALLOS"}')
+    sys.exit(1 if FAILS else 0)
+
+asyncio.run(main())

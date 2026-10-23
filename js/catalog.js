@@ -9,6 +9,8 @@
 let data = null;
 let loading = null;
 const byIssn = new Map();
+const byKey = new Map();
+const key = (s) => fold(s).replace(/[^a-z0-9]+/g, ' ').trim();
 
 const fold = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
@@ -19,7 +21,10 @@ export function loadCatalog() {
       .catch(() => null)
       .then((j) => {
         data = j || { series: [], isbn: {}, extras: [] };
-        for (const s of data.series || []) if (s.issn) byIssn.set(s.issn, s);
+        for (const s of data.series || []) {
+          if (s.issn) byIssn.set(s.issn, s);
+          byKey.set(key(s.name), s);
+        }
         return data;
       });
   }
@@ -30,6 +35,13 @@ export function loadCatalog() {
 export function catalogSeries(issn) {
   return byIssn.get(issn) || null;
 }
+
+// Serie del catálogo por su nombre (o por el ISSN de alguno de sus números)
+export function catalogSeriesFor(name, issn) {
+  return (issn && byIssn.get(issn)) || byKey.get(key(name)) || null;
+}
+
+export const catalogLoaded = () => !!data;
 
 // Ficha de un número concreto de una serie del catálogo
 export function catalogIssue(series, n) {

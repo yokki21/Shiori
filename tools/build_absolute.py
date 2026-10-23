@@ -1,3 +1,5 @@
+# Genera catalog/catalog.json a partir de los datos del catálogo oficial de Panini (panini_absolute_rows.json).
+# Uso: python3 tools/build_absolute.py
 import json, re, sys
 rows = json.load(open(__import__('os').path.join(__import__('os').path.dirname(__file__), 'panini_absolute_rows.json')))
 def issn_from_ean(ean):
@@ -31,4 +33,4 @@ for s in sorted(series.values(), key=lambda x: x["name"]):
     nums = sorted(map(int, s["issues"]))
     missing = [n for n in range(1, max(nums)+1) if n not in nums]
     print(f'{s["name"]}: ISSN {s["issn"]} ({s["ean"]}), nº {nums[0]}-{nums[-1]}, faltan {missing}', file=sys.stderr)
-json.dump(out, open(__import__('os').path.join(__import__('os').path.dirname(__file__), 'catalog.json'),'w'), ensure_ascii=False, indent=1)
+json.dump(out, open(__import__('os').path.join(__import__('os').path.dirname(__file__), '..', 'catalog', 'catalog.json'),'w'), ensure_ascii=False, indent=1)
