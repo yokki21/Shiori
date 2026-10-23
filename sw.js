@@ -1,5 +1,5 @@
 // Service worker: la app funciona sin conexión (salvo la búsqueda de datos).
-const VERSION = 'shiori-v3';
+const VERSION = 'shiori-v4';
 const SHELL = [
   './', 'index.html', 'css/styles.css', 'manifest.webmanifest',
   'js/app.js', 'js/db.js', 'js/ean.js', 'js/lookup.js', 'js/scanner.js',
@@ -9,7 +9,8 @@ const COVERS = 'shiori-covers';
 const FONTS = 'shiori-fonts';
 
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(VERSION).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
+  // cache: 'reload' evita guardar copias viejas de la caché HTTP del navegador
+  e.waitUntil(caches.open(VERSION).then((c) => c.addAll(SHELL.map((u) => new Request(u, { cache: 'reload' })))).then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', (e) => {
@@ -48,12 +49,17 @@ self.addEventListener('fetch', (e) => {
     e.respondWith(cacheFirst(req, FONTS).catch(() => new Response('', { status: 404 })));
     return;
   }
-  // App: primero la caché y se actualiza por detrás
+  // App: primero la red (para tener siempre la última versión) y, sin conexión, la caché
   if (url.origin === location.origin) {
-    e.respondWith(caches.open(VERSION).then(async (cache) => {
-      const hit = await cache.match(req, { ignoreSearch: true });
-      const net = fetch(req).then((res) => { if (res.ok) cache.put(req, res.clone()); return res; }).catch(() => null);
-      return hit || (await net) || cache.match('index.html');
-    }));
+    e.respondWith((async () => {
+      const cache = await caches.open(VERSION);
+      try {
+        const res = await fetch(req, { cache: 'no-cache' });
+        if (res.ok && !url.search) cache.put(req, res.clone());
+        return res;
+      } catch {
+        return (await cache.match(req, { ignoreSearch: true })) || cache.match('index.html');
+      }
+    })());
   }
 });
