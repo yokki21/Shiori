@@ -1024,7 +1024,20 @@ $('#find-results').addEventListener('click', async (e) => {
     // Resultado de Open Library: trae los datos de esa edición concreta
     b.disabled = true;
     const res = await lookupCode(r.isbn);
-    if (res.status === 'ok') r = { ...r, ...res.data, cover: res.data.cover || null };
+    if (res.status === 'ok') {
+      const ed = res.data;
+      const cjk = /[\u3040-\u30ff\u4e00-\u9fff]/.test(r.title);
+      // Se conserva el título de la búsqueda («ONE PIECE 5»), que trae serie y número;
+      // el de la edición suele ser el del capítulo y va detrás. Si la búsqueda vino en japonés, manda la edición.
+      const keep = !cjk && r.series;
+      r = {
+        ...r, ...ed, cover: ed.cover || null,
+        title: keep ? (ed.title && !norm(ed.title).includes(norm(r.series)) ? `${r.title}: ${ed.title}` : r.title) : ed.title || r.title,
+        series: keep ? r.series : ed.series || r.series,
+        number: keep ? r.number : ed.number ?? r.number,
+        publisher: ed.publisher || r.publisher,
+      };
+    }
     else r = { ...r, cover: null };
   }
   const d = newDraft(r, state.scanDest);
