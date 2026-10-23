@@ -216,7 +216,7 @@ function cleanSeries(s) {
 }
 
 const PUBLISHERS = [
-  [/planeta|paneta|glenat|gl[eé]nat/i, 'Planeta Cómic'], [/ivrea/i, 'Ivrea'], [/norma/i, 'Norma Editorial'],
+  [/planeta|paneta/i, 'Planeta Cómic'], [/ivrea/i, 'Ivrea'], [/norma/i, 'Norma Editorial'],
   [/panini/i, 'Panini'], [/\becc\b/i, 'ECC Ediciones'], [/milky/i, 'Milky Way'],
   [/arechi/i, 'Arechi Manga'], [/distrito/i, 'Distrito Manga'], [/kitsune/i, 'Kitsune Books'],
   [/tomodomo/i, 'Tomodomo'], [/moztros/i, 'Moztros'], [/ooso/i, 'Ooso Cómics'],
