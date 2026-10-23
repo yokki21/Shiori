@@ -566,7 +566,7 @@ async function runGoogleTest() {
   const r = await testGoogle();
   out.textContent = r.ok
     ? 'Google Books funciona correctamente.'
-    : ({ quota: 'Sin clave propia: la cuota compartida está agotada. Añade tu clave.', 'quota-own': 'Tu clave ha gastado las búsquedas de hoy.', badkey: 'Google rechaza esta clave. Comprueba que la copiaste entera, que la Books API está activada y que la restricción de sitio incluye yokki21.github.io.', blocked: 'Google ha rechazado la petición.', network: 'No hay conexión con Google Books.' }[r.problem] || 'Error desconocido') + (r.status ? ` (error ${r.status})` : '');
+    : ({ quota: 'Sin clave propia: la cuota compartida está agotada. Añade tu clave.', 'quota-own': 'Tu clave ha gastado las búsquedas de hoy.', badkey: 'Google rechaza esta clave. Comprueba que la copiaste entera, que la Books API está activada y que la restricción de sitio incluye yokki21.github.io.', blocked: 'Google ha rechazado la petición.', down: 'Tu clave está bien, pero Google Books está fallando ahora mismo. Vuelve a probar más tarde.', network: 'No hay conexión con Google Books.' }[r.problem] || 'Error desconocido') + (r.status ? ` (error ${r.status})` : '');
 }
 
 async function renderSettings() {
@@ -1024,6 +1024,7 @@ const GOOGLE_MSG = {
   'quota-own': 'Has gastado las búsquedas diarias de tu clave de Google Books; mañana se renuevan.',
   badkey: 'Google Books rechaza tu clave: revísala en Ajustes.',
   blocked: 'Google Books ha rechazado la búsqueda.',
+  down: 'Google Books está fallando ahora mismo (es un problema suyo, no de tu clave).',
 };
 
 // Línea en el escáner con lo que se acaba de leer: «Editar» abre la ficha y «Deshacer» lo quita

@@ -21,6 +21,7 @@ export function googleProblem(err) {
   if (!err) return null;
   if (err.status === 429) return googleKey ? 'quota-own' : 'quota';
   if (err.status === 400 || err.status === 403) return googleKey ? 'badkey' : 'blocked';
+  if (err.status >= 500) return 'down';
   return 'network';
 }
 
@@ -81,6 +82,21 @@ async function getJson(url, ms = 9000) {
   }
 }
 
+// Google Books devuelve a veces 503 aunque todo esté bien: se reintenta con espera creciente
+async function getJsonRetry(url, tries = 4) {
+  let last;
+  for (let i = 0; i < tries; i++) {
+    try {
+      return await getJson(url, 7000);
+    } catch (e) {
+      last = e;
+      if (!(e.status >= 500) || i === tries - 1) throw e;
+      await new Promise((r) => setTimeout(r, 400 * 2 ** i + Math.random() * 300));
+    }
+  }
+  throw last;
+}
+
 const https = (u) => (u ? u.replace(/^http:/, 'https:').replace('&edge=curl', '') : null);
 
 function idsOf(vi) {
@@ -111,7 +127,7 @@ function mapVolume(v) {
 async function googleByIsbn(code) {
   const tries = [`q=isbn:${code}`, `q=${code}`];
   for (const q of tries) {
-    const j = await getJson(gbUrl(`${q}&country=ES&maxResults=10`));
+    const j = await getJsonRetry(gbUrl(`${q}&country=ES&maxResults=10`));
     const items = j.items || [];
     const hit = items.find((v) => {
       const ids = idsOf(v.volumeInfo || {});
@@ -220,7 +236,7 @@ export async function lookupCode(code) {
 }
 
 async function googleSearch(q) {
-  const j = await getJson(gbUrl(`q=${encodeURIComponent(q)}&langRestrict=es&printType=books&maxResults=20&country=ES`));
+  const j = await getJsonRetry(gbUrl(`q=${encodeURIComponent(q)}&langRestrict=es&printType=books&maxResults=20&country=ES`));
   return (j.items || []).map((v) => enrich(mapVolume(v)));
 }
 
@@ -281,7 +297,7 @@ export async function searchTitle(q) {
 // Prueba la conexión con Google Books (para Ajustes)
 export async function testGoogle() {
   try {
-    const j = await getJson(gbUrl('q=isbn:9788468471495&maxResults=1'));
+    const j = await getJsonRetry(gbUrl('q=isbn:9788468471495&maxResults=1'));
     return { ok: true, n: j.totalItems || 0 };
   } catch (e) {
     return { ok: false, problem: googleProblem(e), status: e.status || null };
