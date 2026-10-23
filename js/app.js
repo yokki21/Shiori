@@ -971,8 +971,8 @@ async function handleIssn(code, addon, { burst, dest }) {
   const notice = ctx.series
     ? `Revista con ISSN ${issn}: es de tu serie ${ctx.series}.${num}`
     : `Este cómic lleva ISSN (${issn}), que identifica la colección y no cada número, así que no sale en las bases de datos. Escribe el nombre de la serie una vez: los próximos números de esta colección se rellenarán solos.${g.n != null ? ` El código pequeño indica el nº ${g.n}.` : ''}`;
+  // Sin enfocar ningún campo a mano: en iPhone desplaza la pantalla y la ficha se queda fuera de la vista
   openComic(d, { isNew: true, notice, warn: !ctx.series });
-  if (!ctx.series) setTimeout(() => F.series.focus(), 250);
 }
 
 // Recorrido común: escáner, ISBN escrito o foto
