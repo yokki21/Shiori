@@ -897,7 +897,7 @@ async function onScanned(code, addon) {
 
 // Ya está en Shiori: avisa (o en ráfaga, lo apunta y sigue)
 async function handleExisting(existing, burst, dest) {
-  if (burst) {
+  if (burst && !scanEl.hidden) {
     if (existing.status === 'deseo' && dest === 'coleccion') {
       await saveComic({ ...existing, status: 'coleccion', purchaseDate: today() });
       burstLog(existing, 'Pasado de Lo quiero a tu colección');
@@ -958,6 +958,9 @@ async function handleIssn(code, addon, { burst, quick, dest }) {
     const existing = state.comics.find((c) => c.issn === issn && c.number === g.n);
     if (existing) { await handleExisting(existing, burst || quick, dest); return; }
   }
+  // Serie del catálogo pero sin número leído (ISSN escrito a mano, foto sin el código pequeño…):
+  // se elige el número tocando su portada
+  if (cat && g.from !== 'addon' && !burst) { await openIssuePicker(cat, code, dest); return; }
   const issue = cat && g.n != null ? catalogIssue(cat, g.n) : null;
   const d = newDraft(issue || {
     title: ctx.series && g.n != null ? `${ctx.series} nº ${g.n}` : '',
@@ -970,9 +973,7 @@ async function handleIssn(code, addon, { burst, quick, dest }) {
     if (!d.title) d.title = `Revista ISSN ${issn}${g.n != null ? ` nº ${g.n}` : ''}`;
     delete d.seriesTotal;
     await saveComic(d);
-    render();
-    burstLog(d, ctx.series ? `${dest === 'deseo' ? 'Añadido a Lo quiero' : 'Añadido'}${g.from === 'next' ? ' (revisa el número)' : ''}` : 'Revista nueva: ponle el nombre de la serie luego');
-    scanStatusAfterAdd();
+    await announceAdded(d, ctx.series ? `${dest === 'deseo' ? 'Añadido a Lo quiero' : 'Añadido'}${g.from === 'next' ? ' (revisa el número)' : ''}` : 'Revista nueva: ponle el nombre de la serie luego');
     return;
   }
   await closeAllLayers();
@@ -992,7 +993,7 @@ async function handleIssn(code, addon, { burst, quick, dest }) {
 async function handleCode(code, { fromScanner = false, addon = null } = {}) {
   const dest = state.scanDest;
   const burst = state.burst && fromScanner;
-  const quick = state.autoAdd && fromScanner; // añadir sin abrir la ficha si se encuentra
+  const quick = state.autoAdd; // añadir sin abrir la ficha si se encuentra (cámara, ISBN escrito o foto)
   if (isIssnEan(code)) { await handleIssn(code, addon, { burst, quick, dest }); return; }
   const existing = state.comics.find((c) => c.isbn === code);
   if (existing) { await handleExisting(existing, burst || quick, dest); return; }
@@ -1008,9 +1009,7 @@ async function handleCode(code, { fromScanner = false, addon = null } = {}) {
     await finishDraftExtras(d);
     await saveComic(d);
     if (d.type && d.type !== 'otro') { state.lastType = d.type; db.setKv('lastType', d.type); }
-    render();
-    burstLog(d, res.status === 'ok' ? (dest === 'deseo' ? 'Añadido a Lo quiero' : 'Añadido') : 'No encontrado: completa los datos luego');
-    scanStatusAfterAdd();
+    await announceAdded(d, res.status === 'ok' ? (dest === 'deseo' ? 'Añadido a Lo quiero' : 'Añadido') : 'No encontrado: completa los datos luego');
     return;
   }
 
@@ -1052,6 +1051,45 @@ function burstLog(c, text) {
   log.prepend(el);
   while (log.children.length > 3) log.lastChild.remove();
 }
+
+// Avisa de lo añadido: en el escáner, como línea de la lista; fuera, con un aviso y «Deshacer»
+async function announceAdded(d, text) {
+  render();
+  if (!scanEl.hidden) { burstLog(d, text); scanStatusAfterAdd(); return; }
+  await closeAllLayers();
+  toast(`${text}: ${d.title}`, 'Deshacer', async () => { await removeComic(d.id); render(); });
+}
+
+// Selector de número por portada para una serie del catálogo
+let picking = null;
+async function openIssuePicker(cat, code, dest) {
+  await closeAllLayers();
+  picking = { cat, code, dest };
+  $('#pick-heading').textContent = cat.name;
+  const nums = Object.keys(cat.issues).map(Number).sort((a, b) => a - b);
+  $('#pick-body').innerHTML = `
+    <p class="muted">Es ${esc(cat.name)} (${esc(cat.publisher)}). Toca el número que tienes${dest === 'deseo' ? ' para añadirlo a Lo quiero' : ''}.</p>
+    <div class="pick-grid">${nums.map((n) => {
+      const it = catalogIssue(cat, n);
+      const have = state.comics.find((c) => c.issn === cat.issn && c.number === n);
+      return `<button class="pick${have ? ' owned' : ''}" data-n="${n}">${coverHTML(it)}<span class="cap">Nº ${n}</span>${have ? `<span class="have">${have.status === 'coleccion' ? 'Lo tienes' : 'En Lo quiero'}</span>` : ''}</button>`;
+    }).join('')}</div>`;
+  openDialog($('#sheet-pick'));
+}
+$('#pick-body').addEventListener('click', async (e) => {
+  const b = e.target.closest('.pick');
+  if (!b || !picking) return;
+  const { cat, code, dest } = picking;
+  const n = +b.dataset.n;
+  const have = state.comics.find((c) => c.issn === cat.issn && c.number === n);
+  if (have) { await closeAllLayers(); editComic(have); return; }
+  const d = newDraft(catalogIssue(cat, n), dest);
+  Object.assign(d, { issn: cat.issn, barcode: code || cat.ean || null });
+  if (!state.autoAdd) { await closeAllLayers(); openComic(d, { isNew: true }); return; }
+  delete d.seriesTotal;
+  await saveComic(d);
+  await announceAdded(d, dest === 'deseo' ? 'Añadido a Lo quiero' : 'Añadido');
+});
 
 function scanStatusAfterAdd() {
   status(state.burst ? 'Ráfaga: cada código se guarda solo. Ve pasando tomos.' : 'Listo. Escanea el siguiente o cierra.');

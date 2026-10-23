@@ -1,5 +1,5 @@
 // Service worker: la app funciona sin conexión (salvo la búsqueda de datos).
-const VERSION = 'shiori-v9';
+const VERSION = 'shiori-v10';
 const SHELL = [
   './', 'index.html', 'css/styles.css', 'manifest.webmanifest',
   'js/app.js', 'js/db.js', 'js/ean.js', 'js/lookup.js', 'js/scanner.js', 'js/config.js', 'js/catalog.js',

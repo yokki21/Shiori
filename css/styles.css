@@ -383,3 +383,11 @@ dialog.sheet::backdrop { background: rgba(10, 12, 20, .45); }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition: none !important; }
 }
+
+/* ---------- Elegir número por portada ---------- */
+.pick-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 16px 10px; margin-top: 12px; }
+.pick { position: relative; display: grid; gap: 4px; justify-items: center; border: 0; background: none; padding: 0; color: var(--ink); }
+.pick .cover { width: 100%; }
+.pick .cap { font-weight: 700; font-size: 14px; }
+.pick .have { position: absolute; top: 6px; left: 6px; z-index: 2; padding: 2px 6px; border-radius: 6px; background: var(--ai); color: var(--on-ai); font-size: 11px; font-weight: 700; }
+.pick.owned .cover { opacity: .5; }
