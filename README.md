@@ -74,6 +74,18 @@ icons/                iconos
 - Las grapas de quiosco suelen llevar un código que no es ISBN (empieza por 977) y no se encuentran; se añaden a mano.
 - Google Books sin clave comparte una cuota global que suele estar agotada (error 429). Con una clave propia (gratis, 1.000 búsquedas al día) funciona bien: se añade en *Ajustes → Clave de Google Books* y se guarda solo en el dispositivo, nunca en el repositorio.
 
+## Fuente extra: base de datos de libros editados en España
+
+La Agencia del ISBN (Ministerio de Cultura) tiene casi todos los tomos editados en España, con título exacto de la edición, editorial y precio. Su buscador no se puede consultar desde el navegador, así que hace falta un pequeño intermediario gratuito en Cloudflare (`worker/isbn-espana.js`):
+
+1. Crea una cuenta gratuita en https://dash.cloudflare.com.
+2. Ve a *Workers y Pages → Crear → Crear Worker*, llámalo `shiori-isbn` y pulsa *Implementar*.
+3. Pulsa *Editar código*, borra lo que hay, pega el contenido de [`worker/isbn-espana.js`](worker/isbn-espana.js) y pulsa *Implementar*.
+4. Comprueba que funciona abriendo `https://shiori-isbn.TU-SUBDOMINIO.workers.dev/?isbn=9788468471563`: debe salir un JSON con «One Piece 5».
+5. Pon esa dirección en `js/config.js` (`MINISTRY_URL`). No es secreta: el intermediario solo responde a peticiones desde `yokki21.github.io`.
+
+El plan gratuito de Cloudflare permite 100.000 consultas al día y el intermediario guarda cada respuesta 7 días en caché.
+
 ## Conseguir la clave de Google Books
 
 1. Entra en https://console.cloud.google.com/ y crea un proyecto (por ejemplo «Shiori»).

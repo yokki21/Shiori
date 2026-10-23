@@ -10,6 +10,7 @@ const state = {
   filters: { q: '', reading: '', type: '', sort: 'recent' },
   scanDest: 'coleccion',
   burst: false,
+  autoAdd: true,
   lastType: 'manga',
   monthSel: null,
 };
@@ -547,6 +548,11 @@ $('#stats').addEventListener('click', (e) => {
 });
 
 // ---------- Ajustes ----------
+$('#auto-add').addEventListener('change', (e) => {
+  state.autoAdd = e.target.checked;
+  db.setKv('autoAdd', state.autoAdd);
+});
+
 $('#google-save').addEventListener('click', async () => {
   const k = $('#google-key').value.trim();
   setGoogleKey(k);
@@ -940,13 +946,13 @@ function guessIssueNumber(addon, nums) {
   return { n: null, from: null };
 }
 
-async function handleIssn(code, addon, { burst, dest }) {
+async function handleIssn(code, addon, { burst, quick, dest }) {
   const issn = issnFromEan(code);
   const ctx = issnContext(issn);
   const g = guessIssueNumber(addon, ctx.nums);
   if (g.from === 'addon') {
     const existing = state.comics.find((c) => c.issn === issn && c.number === g.n);
-    if (existing) { await handleExisting(existing, burst, dest); return; }
+    if (existing) { await handleExisting(existing, burst || quick, dest); return; }
   }
   const d = newDraft({
     title: ctx.series && g.n != null ? `${ctx.series} nº ${g.n}` : '',
@@ -954,14 +960,14 @@ async function handleIssn(code, addon, { burst, dest }) {
   }, dest);
   Object.assign(d, { issn, barcode: code, addon: addon || null });
 
-  if (burst) {
+  // Serie conocida y número leído del código: se añade sin preguntar
+  if (burst || (quick && ctx.series && g.from === 'addon')) {
     if (!d.title) d.title = `Revista ISSN ${issn}${g.n != null ? ` nº ${g.n}` : ''}`;
     delete d.seriesTotal;
     await saveComic(d);
     render();
-    burstLog(d, ctx.series ? `Añadido${g.from === 'next' ? ' (revisa el número)' : ''}` : 'Revista nueva: ponle el nombre de la serie luego', true);
-    status('Ráfaga: cada código se guarda solo. Ve pasando tomos.');
-    scanner?.pause(1400);
+    burstLog(d, ctx.series ? `${dest === 'deseo' ? 'Añadido a Lo quiero' : 'Añadido'}${g.from === 'next' ? ' (revisa el número)' : ''}` : 'Revista nueva: ponle el nombre de la serie luego');
+    scanStatusAfterAdd();
     return;
   }
   await closeAllLayers();
@@ -979,22 +985,23 @@ async function handleIssn(code, addon, { burst, dest }) {
 async function handleCode(code, { fromScanner = false, addon = null } = {}) {
   const dest = state.scanDest;
   const burst = state.burst && fromScanner;
-  if (isIssnEan(code)) { await handleIssn(code, addon, { burst, dest }); return; }
+  const quick = state.autoAdd && fromScanner; // añadir sin abrir la ficha si se encuentra
+  if (isIssnEan(code)) { await handleIssn(code, addon, { burst, quick, dest }); return; }
   const existing = state.comics.find((c) => c.isbn === code);
-  if (existing) { await handleExisting(existing, burst, dest); return; }
+  if (existing) { await handleExisting(existing, burst || quick, dest); return; }
 
   status(`Buscando ${code}…`);
   const res = await lookupCode(code);
   const d = newDraft(res.status === 'ok' ? res.data : { isbn: code }, dest);
 
-  if (burst) {
+  if (burst || (quick && res.status === 'ok' && d.title)) {
     if (!d.title) d.title = `ISBN ${code}`;
-    delete d.seriesTotal;
+    await finishDraftExtras(d);
     await saveComic(d);
+    if (d.type && d.type !== 'otro') { state.lastType = d.type; db.setKv('lastType', d.type); }
     render();
-    burstLog(d, res.status === 'ok' ? (dest === 'deseo' ? 'Añadido a Lo quiero' : 'Añadido') : 'No encontrado: completa los datos luego', true);
-    status('Ráfaga: cada código se guarda solo. Ve pasando tomos.');
-    scanner?.pause(1400);
+    burstLog(d, res.status === 'ok' ? (dest === 'deseo' ? 'Añadido a Lo quiero' : 'Añadido') : 'No encontrado: completa los datos luego');
+    scanStatusAfterAdd();
     return;
   }
 
@@ -1005,7 +1012,7 @@ async function handleCode(code, { fromScanner = false, addon = null } = {}) {
     notfound: isIsbn(code)
       ? (gProblem
         ? `No está en Open Library y Google Books no ha respondido.${gProblem} Mientras tanto, prueba «Buscar por título» o rellénalo a mano.`
-        : 'No he encontrado este ISBN en Google Books ni en Open Library. Prueba «Buscar por título» o rellénalo a mano.')
+        : 'No he encontrado este ISBN en ninguna de las bases de datos. Prueba «Buscar por título» o rellénalo a mano.')
       : `Este código (${code}) no es un ISBN; suele pasar con las grapas de quiosco. Prueba «Buscar por título» o rellénalo a mano.`,
     offline: 'Sin conexión. Guárdalo con el ISBN y luego pulsa «Buscar datos otra vez».',
   };
@@ -1019,15 +1026,38 @@ const GOOGLE_MSG = {
   blocked: 'Google Books ha rechazado la búsqueda.',
 };
 
-function burstLog(c, text, undoable = false) {
+// Línea en el escáner con lo que se acaba de leer: «Editar» abre la ficha y «Deshacer» lo quita
+function burstLog(c, text) {
   const log = $('#burst-log');
   const el = document.createElement('div');
   el.className = 'burst-item';
   const img = c.coverData || c.cover;
-  el.innerHTML = `${img ? `<img src="${esc(img)}" alt="" referrerpolicy="no-referrer">` : '<i class="ph"></i>'}<span><b>${esc(c.title)}</b><br>${esc(text)}</span>${undoable ? '<button>Deshacer</button>' : ''}`;
-  if (undoable) el.querySelector('button').onclick = async () => { await removeComic(c.id); render(); el.remove(); };
+  const isNew = /^Añadido|^No encontrado|^Revista nueva/.test(text);
+  el.innerHTML = `${img ? `<img src="${esc(img)}" alt="" referrerpolicy="no-referrer">` : '<i class="ph"></i>'}<span><b>${esc(c.title)}</b><br>${esc(text)}</span><button data-a="edit">Editar</button>${isNew ? '<button data-a="undo">Deshacer</button>' : ''}`;
+  el.addEventListener('click', async (e) => {
+    const a = e.target.closest('button')?.dataset.a;
+    if (a === 'undo') { await removeComic(c.id); render(); el.remove(); }
+    if (a === 'edit') { const cur = byId(c.id); if (!cur) return; await closeAllLayers(); editComic(cur); }
+  });
   log.prepend(el);
   while (log.children.length > 3) log.lastChild.remove();
+}
+
+function scanStatusAfterAdd() {
+  status(state.burst ? 'Ráfaga: cada código se guarda solo. Ve pasando tomos.' : 'Listo. Escanea el siguiente o cierra.');
+  scanner?.pause(1400);
+}
+
+// Lo que hace «Guardar» además de guardar, para cuando se añade sin ficha
+async function finishDraftExtras(d) {
+  if (d.status === 'coleccion' && d.series && d.number != null) {
+    const ph = state.comics.find((c) => c.id !== d.id && c.status === 'deseo' && !c.isbn && seriesKey(c.series) === seriesKey(d.series) && c.number === d.number);
+    if (ph) await removeComic(ph.id);
+  }
+  if (d.seriesTotal && d.series && !state.seriesMeta.get(seriesKey(d.series))?.total) {
+    await saveSeriesMeta({ key: seriesKey(d.series), name: d.series, total: d.seriesTotal, finished: false });
+  }
+  delete d.seriesTotal;
 }
 
 // Escribir ISBN / buscar por título
@@ -1137,7 +1167,9 @@ $('#scan-photo').addEventListener('change', async (e) => {
 // ---------- Arranque ----------
 async function init() {
   try {
-    const [comics, series, lastType, sort, gkey] = await Promise.all([db.all('comics'), db.all('series'), db.getKv('lastType'), db.getKv('sort'), db.getKv('googleKey')]);
+    const [comics, series, lastType, sort, gkey, autoAdd] = await Promise.all([db.all('comics'), db.all('series'), db.getKv('lastType'), db.getKv('sort'), db.getKv('googleKey'), db.getKv('autoAdd')]);
+    state.autoAdd = autoAdd !== false;
+    $('#auto-add').checked = state.autoAdd;
     setGoogleKey(gkey || '');
     $('#google-key').value = gkey || '';
     state.comics = comics;

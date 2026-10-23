@@ -4,12 +4,15 @@
 // (error 429), así que se puede configurar una clave propia en Ajustes.
 
 import { isValidEan13 } from './ean.js';
+import { MINISTRY_URL } from './config.js';
 
 const GB = 'https://www.googleapis.com/books/v1/volumes';
 const OL = 'https://openlibrary.org/api/books';
 const OL_SEARCH = 'https://openlibrary.org/search.json';
 
 let googleKey = '';
+const ministryUrl = MINISTRY_URL.replace(/\/$/, '');
+export const hasMinistry = !!ministryUrl;
 export function setGoogleKey(k) { googleKey = (k || '').trim(); }
 const gbUrl = (params) => `${GB}?${params}${googleKey ? `&key=${encodeURIComponent(googleKey)}` : ''}`;
 
@@ -138,6 +141,39 @@ async function openLibraryByIsbn(code) {
   };
 }
 
+// Base de datos de libros editados en España (vía el intermediario de Cloudflare)
+async function ministryByIsbn(code) {
+  if (!ministryUrl) return null;
+  const j = await getJson(`${ministryUrl}/?isbn=${code}`, 12000);
+  if (!j.found) return null;
+  const pages = (j.description || '').match(/(\d+)\s*p\./);
+  return {
+    title: j.title || '',
+    subtitle: '',
+    // Quita traductores e ilustradores secundarios: "Oda, Eiichiro (1975-) Kikuchi, Katsu ; tr."
+    authors: (j.authors || '').split(/\s(?=[A-ZÁÉÍÓÚÑ][^,;()]*,\s)/).filter((a) => !/;\s*(tr|il|ed|col)\./.test(a)).map((a) => a.replace(/\s*\(\d{4}-?\d*\)/, '').trim().replace(/^([^,]+),\s*(.+)$/, '$2 $1')).join(', '),
+    publisher: j.publisher || '',
+    publishedDate: j.date || '',
+    pages: pages ? +pages[1] : null,
+    cover: null,
+    categories: j.subjects || '',
+    description: '',
+    isbn: code,
+    // El Ministerio da el precio sin IVA; los libros llevan un 4 %
+    price: j.priceNoVat ? Math.round(j.priceNoVat * 1.04 * 100) / 100 : null,
+  };
+}
+
+async function ministrySearch(q) {
+  if (!ministryUrl) return [];
+  const j = await getJson(`${ministryUrl}/?q=${encodeURIComponent(q)}`, 12000);
+  return (j.results || []).filter((r) => isValidEan13(r.isbn)).map((r) => enrich({
+    title: r.title, subtitle: '', authors: '', publisher: r.publisher, publishedDate: r.year,
+    pages: null, categories: '', description: '', price: null,
+    cover: `https://covers.openlibrary.org/b/isbn/${r.isbn}-M.jpg`, isbn: r.isbn, needsLookup: true,
+  }));
+}
+
 function probeImage(url, ms = 6000) {
   return new Promise((res) => {
     const img = new Image();
@@ -152,16 +188,29 @@ function probeImage(url, ms = 6000) {
 // `google` explica por qué falló Google Books (cuota, clave…), si falló.
 export async function lookupCode(code) {
   if (!navigator.onLine) return { status: 'offline' };
-  const [gb, ol] = await Promise.allSettled([googleByIsbn(code), isIsbn(code) ? openLibraryByIsbn(code) : null]);
+  const [gb, ol, mi] = await Promise.allSettled([
+    googleByIsbn(code),
+    isIsbn(code) ? openLibraryByIsbn(code) : null,
+    isIsbn(code) ? ministryByIsbn(code) : null,
+  ]);
   const a = gb.status === 'fulfilled' ? gb.value : null;
   const b = ol.status === 'fulfilled' ? ol.value : null;
+  const c = mi.status === 'fulfilled' ? mi.value : null;
   const google = gb.status === 'rejected' ? googleProblem(gb.reason) : null;
-  if (!a && !b) {
+  if (!a && !b && !c) {
     const failed = gb.status === 'rejected' && google === 'network' && (ol.status === 'rejected' || !isIsbn(code));
     return { status: failed ? 'offline' : 'notfound', google };
   }
+  // Prioridad: el Ministerio para título, editorial y precio (edición española exacta);
+  // Google y Open Library para portada, descripción y lo que falte.
   const data = { ...(b || {}), ...(a || {}) };
   for (const k of Object.keys(b || {})) if (!data[k] && b[k]) data[k] = b[k];
+  if (c) {
+    for (const k of ['title', 'publisher', 'price', 'publishedDate']) if (c[k]) data[k] = c[k];
+    if (c.title) data.subtitle = '';
+    for (const k of Object.keys(c)) if (!data[k] && c[k]) data[k] = c[k];
+    if (c.categories) data.categories = [c.categories, data.categories].filter(Boolean).join(' / ');
+  }
   if (!data.cover && isIsbn(code)) {
     const url = `https://covers.openlibrary.org/b/isbn/${code}-M.jpg?default=false`;
     if (await probeImage(url)) data.cover = url;
@@ -212,15 +261,16 @@ function score(r, q) {
 
 // Devuelve { results, google } con los resultados de ambas fuentes
 export async function searchTitle(q) {
-  const [gb, ol] = await Promise.allSettled([googleSearch(q), openLibrarySearch(q)]);
+  const [gb, ol, mi] = await Promise.allSettled([googleSearch(q), openLibrarySearch(q), ministrySearch(q)]);
   const results = [];
   const seen = new Set();
-  for (const r of [...(gb.status === 'fulfilled' ? gb.value : []), ...(ol.status === 'fulfilled' ? ol.value : [])]) {
+  const ok = (x) => (x.status === 'fulfilled' ? x.value : []);
+  for (const r of [...ok(gb), ...ok(mi), ...ok(ol)]) {
     const k = r.isbn || r.title;
     if (seen.has(k)) continue;
     seen.add(k); results.push(r);
   }
-  if (gb.status === 'rejected' && ol.status === 'rejected') throw gb.reason;
+  if (gb.status === 'rejected' && ol.status === 'rejected' && (mi.status === 'rejected' || !ministryUrl)) throw gb.reason;
   const scored = results.map((r, i) => ({ r, i, sc: score(r, q) }));
   const best = Math.max(0, ...scored.map((x) => x.sc));
   // Fuera lo que no se parece en nada si hay resultados que sí
@@ -248,6 +298,9 @@ export function parseTitle(title = '', subtitle = '') {
   if (m && m[1].trim()) {
     return { series: cleanSeries(m[1]), number: +m[2], total: m[3] ? +m[3] : null };
   }
+  // "One Piece 5, Por quién doblan las campanas" (Agencia del ISBN)
+  m = full.match(/^(.*?\D)\s0*(\d{1,3})\s*[,:]\s+\S/);
+  if (m) return { series: cleanSeries(m[1]), number: +m[2], total: null };
   // "Chainsaw Man 5", "Berserk Maximum 03" (sin año)
   m = full.match(/^(.*\D)\s0*(\d{1,3})(?:\s*\/\s*(\d{1,3}))?$/);
   if (m) return { series: cleanSeries(m[1]), number: +m[2], total: m[3] ? +m[3] : null };
@@ -261,7 +314,7 @@ function cleanSeries(s) {
 }
 
 const PUBLISHERS = [
-  [/planeta|paneta/i, 'Planeta Cómic'], [/ivrea/i, 'Ivrea'], [/norma/i, 'Norma Editorial'],
+  [/planeta|paneta/i, 'Planeta Cómic'], [/ivrea/i, 'Ivrea'], [/norma/i, 'Norma Editorial'], [/ediciones ecc|^ecc\b/i, 'ECC Ediciones'],
   [/panini/i, 'Panini'], [/\becc\b/i, 'ECC Ediciones'], [/milky/i, 'Milky Way'],
   [/arechi/i, 'Arechi Manga'], [/distrito/i, 'Distrito Manga'], [/kitsune/i, 'Kitsune Books'],
   [/tomodomo/i, 'Tomodomo'], [/moztros/i, 'Moztros'], [/ooso/i, 'Ooso Cómics'],
