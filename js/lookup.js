@@ -154,7 +154,7 @@ async function openLibrarySearch(q) {
   const j = await getJson(`${OL_SEARCH}?q=${encodeURIComponent(q)}&fields=title,author_name,publisher,isbn,cover_i&limit=60`);
   const out = [];
   for (const d of j.docs || []) {
-    const isbns = (d.isbn || []).filter((i) => /^97[89]84\d{8}$/.test(i) && isValidEan13(i));
+    const isbns = (d.isbn || []).filter((i) => /^97884\d{8}$/.test(i) && isValidEan13(i));
     for (const isbn of isbns.slice(0, 3)) {
       out.push(enrich({
         title: d.title || '', subtitle: '', authors: (d.author_name || []).join(', '),
@@ -164,9 +164,23 @@ async function openLibrarySearch(q) {
         isbn, needsLookup: true,
       }));
     }
-    if (out.length >= 24) break;
+    if (out.length >= 40) break;
   }
   return out;
+}
+
+const fold = (x) => String(x || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
+// Puntúa cuánto se parece un resultado a lo buscado (palabras y número)
+function score(r, q) {
+  const words = fold(q).split(/[^a-z0-9]+/).filter(Boolean);
+  const title = fold(`${r.title} ${r.series}`);
+  let sc = 0;
+  for (const w of words) {
+    if (/^\d+$/.test(w)) { if (r.number === +w) sc += 3; else if (new RegExp(`\\b0*${+w}\\b`).test(title)) sc += 1; }
+    else if (title.includes(w)) sc += 2;
+  }
+  return sc;
 }
 
 // Devuelve { results, google } con los resultados de ambas fuentes
@@ -180,7 +194,11 @@ export async function searchTitle(q) {
     seen.add(k); results.push(r);
   }
   if (gb.status === 'rejected' && ol.status === 'rejected') throw gb.reason;
-  return { results, google: gb.status === 'rejected' ? googleProblem(gb.reason) : null };
+  const scored = results.map((r, i) => ({ r, i, sc: score(r, q) }));
+  const best = Math.max(0, ...scored.map((x) => x.sc));
+  // Fuera lo que no se parece en nada si hay resultados que sí
+  const kept = scored.filter((x) => best === 0 || x.sc > 0).sort((a, b) => b.sc - a.sc || a.i - b.i);
+  return { results: kept.map((x) => x.r).slice(0, 30), google: gb.status === 'rejected' ? googleProblem(gb.reason) : null };
 }
 
 // Prueba la conexión con Google Books (para Ajustes)
