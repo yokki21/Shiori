@@ -1,6 +1,6 @@
 import { db, uid } from './db.js';
 import { Scanner, scanFile } from './scanner.js';
-import { lookupCode, searchTitle, normalizeIsbn, isIsbn, parseTitle, normalizePublisher, guessType, setGoogleKey, testGoogle } from './lookup.js';
+import { lookupCode, searchTitle, normalizeIsbn, isIsbn, isIssnEan, issnFromEan, eanFromIssn, parseTitle, normalizePublisher, guessType, setGoogleKey, testGoogle } from './lookup.js';
 
 // ---------- Estado ----------
 const state = {
@@ -199,7 +199,7 @@ function renderLibrary() {
   let list = all;
   if (f.q) {
     const q = norm(f.q);
-    list = list.filter((c) => norm([c.title, c.series, c.publisher, c.authors, c.isbn].join(' ')).includes(q));
+    list = list.filter((c) => norm([c.title, c.series, c.publisher, c.authors, c.isbn, c.issn].join(' ')).includes(q));
   }
   if (f.reading) list = list.filter((c) => c.reading === f.reading);
   if (f.type) list = list.filter((c) => c.type === f.type);
@@ -685,6 +685,9 @@ function fillForm() {
   refreshCover();
   $('#comic-delete').hidden = draftIsNew;
   $('#comic-retry').hidden = !(d.isbn && (!d.title || !d.cover));
+  $('#issn-field').hidden = !d.issn;
+  $('#isbn-field').hidden = !!d.issn && !d.isbn;
+  $('#issn-value').value = d.issn ? `${d.issn}${d.addon ? `  (código ${d.addon})` : ''}` : '';
   $('#comic-search').hidden = !(draftIsNew && !d.title);
 }
 function refreshCover() {
@@ -874,42 +877,111 @@ function flashHit() {
 }
 
 let lastSeen = { code: null, at: 0 };
-async function onScanned(code) {
+async function onScanned(code, addon) {
   // El mismo tomo sigue delante de la cámara: no repetir
-  const repeat = lastSeen.code === code && Date.now() - lastSeen.at < 4000;
-  lastSeen = { code, at: Date.now() };
+  const key = `${code}|${addon || ''}`;
+  const repeat = lastSeen.code === key && Date.now() - lastSeen.at < 4000;
+  lastSeen = { code: key, at: Date.now() };
   if (repeat) return;
   scanner?.pause();
   flashHit();
-  await handleCode(code, { fromScanner: true });
+  await handleCode(code, { fromScanner: true, addon });
+}
+
+// Ya está en Shiori: avisa (o en ráfaga, lo apunta y sigue)
+async function handleExisting(existing, burst, dest) {
+  if (burst) {
+    if (existing.status === 'deseo' && dest === 'coleccion') {
+      await saveComic({ ...existing, status: 'coleccion', purchaseDate: today() });
+      burstLog(existing, 'Pasado de Lo quiero a tu colección');
+      render();
+    } else {
+      burstLog(existing, existing.status === 'coleccion' ? 'Ya lo tienes' : 'Ya está en Lo quiero');
+    }
+    scanner?.pause(1600);
+    return;
+  }
+  await closeAllLayers();
+  if (existing.status === 'deseo' && dest === 'coleccion') {
+    openComic({ ...existing, status: 'coleccion', purchaseDate: today() }, { notice: 'Estaba en Lo quiero. Al guardar pasa a tu colección.' });
+  } else {
+    openComic(existing, { notice: existing.status === 'coleccion' ? 'Ya lo tienes en tu colección.' : 'Ya está en tu lista de Lo quiero.' });
+  }
+}
+
+// ---------- Revistas y grapas con ISSN ----------
+// El ISSN identifica la colección, no cada número, así que no hay base de
+// datos que consultar: Shiori aprende la serie de los números que ya tienes
+// y saca el número del suplemento de 2 o 5 cifras cuando se puede leer.
+function issnContext(issn) {
+  const same = state.comics.filter((c) => c.issn === issn).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+  const ref = same.find((c) => c.series) || same[0];
+  return {
+    series: ref?.series || '', publisher: ref?.publisher || '', type: ref?.type || null,
+    price: ref?.price ?? null, nums: same.map((c) => c.number).filter((n) => n != null),
+  };
+}
+
+function guessIssueNumber(addon, nums) {
+  const max = nums.length ? Math.max(...nums) : null;
+  if (addon) {
+    let n = parseInt(addon, 10);
+    // 5 cifras: o el número tal cual (00042) o la convención americana (3 cifras de número + portada + impresión)
+    if (addon.length === 5 && n >= 1000) n = parseInt(addon.slice(0, 3), 10);
+    // 2 cifras: solo las dos últimas del número; se completa con lo que ya tienes
+    if (addon.length === 2 && max != null && max >= 100) {
+      let cand = Math.floor(max / 100) * 100 + n;
+      if (cand < max - 50) cand += 100;
+      n = cand;
+    }
+    if (n > 0) return { n, from: 'addon' };
+  }
+  if (max != null) return { n: max + 1, from: 'next' };
+  return { n: null, from: null };
+}
+
+async function handleIssn(code, addon, { burst, dest }) {
+  const issn = issnFromEan(code);
+  const ctx = issnContext(issn);
+  const g = guessIssueNumber(addon, ctx.nums);
+  if (g.from === 'addon') {
+    const existing = state.comics.find((c) => c.issn === issn && c.number === g.n);
+    if (existing) { await handleExisting(existing, burst, dest); return; }
+  }
+  const d = newDraft({
+    title: ctx.series && g.n != null ? `${ctx.series} nº ${g.n}` : '',
+    series: ctx.series, number: g.n, publisher: ctx.publisher, type: ctx.type, price: ctx.price,
+  }, dest);
+  Object.assign(d, { issn, barcode: code, addon: addon || null });
+
+  if (burst) {
+    if (!d.title) d.title = `Revista ISSN ${issn}${g.n != null ? ` nº ${g.n}` : ''}`;
+    delete d.seriesTotal;
+    await saveComic(d);
+    render();
+    burstLog(d, ctx.series ? `Añadido${g.from === 'next' ? ' (revisa el número)' : ''}` : 'Revista nueva: ponle el nombre de la serie luego', true);
+    status('Ráfaga: cada código se guarda solo. Ve pasando tomos.');
+    scanner?.pause(1400);
+    return;
+  }
+  await closeAllLayers();
+  const num = g.from === 'addon'
+    ? ` El número ${g.n} sale del código pequeño de la derecha: compruébalo.`
+    : g.from === 'next' ? ` No he podido leer el número; te propongo el ${g.n}, el siguiente al último que tienes.` : '';
+  const notice = ctx.series
+    ? `Revista con ISSN ${issn}: es de tu serie ${ctx.series}.${num}`
+    : `Este cómic lleva ISSN (${issn}), que identifica la colección y no cada número, así que no sale en las bases de datos. Escribe el nombre de la serie una vez: los próximos números de esta colección se rellenarán solos.${g.n != null ? ` El código pequeño indica el nº ${g.n}.` : ''}`;
+  openComic(d, { isNew: true, notice, warn: !ctx.series });
+  if (!ctx.series) setTimeout(() => F.series.focus(), 250);
 }
 
 // Recorrido común: escáner, ISBN escrito o foto
-async function handleCode(code, { fromScanner = false } = {}) {
+async function handleCode(code, { fromScanner = false, addon = null } = {}) {
   const dest = state.scanDest;
   const burst = state.burst && fromScanner;
+  if (isIssnEan(code)) { await handleIssn(code, addon, { burst, dest }); return; }
   const existing = state.comics.find((c) => c.isbn === code);
-
-  if (existing) {
-    if (burst) {
-      if (existing.status === 'deseo' && dest === 'coleccion') {
-        await saveComic({ ...existing, status: 'coleccion', purchaseDate: today() });
-        burstLog(existing, 'Pasado de Lo quiero a tu colección');
-        render();
-      } else {
-        burstLog(existing, existing.status === 'coleccion' ? 'Ya lo tienes' : 'Ya está en Lo quiero');
-      }
-      scanner?.pause(1600);
-      return;
-    }
-    await closeAllLayers();
-    if (existing.status === 'deseo' && dest === 'coleccion') {
-      openComic({ ...existing, status: 'coleccion', purchaseDate: today() }, { notice: 'Estaba en Lo quiero. Al guardar pasa a tu colección.' });
-    } else {
-      openComic(existing, { notice: existing.status === 'coleccion' ? 'Ya lo tienes en tu colección.' : 'Ya está en tu lista de Lo quiero.' });
-    }
-    return;
-  }
+  if (existing) { await handleExisting(existing, burst, dest); return; }
 
   status(`Buscando ${code}…`);
   const res = await lookupCode(code);
@@ -967,8 +1039,8 @@ function openFind(mode) {
   $('#find-heading').textContent = mode === 'isbn' ? 'Escribir ISBN' : 'Buscar por título';
   input.value = '';
   input.inputMode = mode === 'isbn' ? 'numeric' : 'text';
-  input.placeholder = mode === 'isbn' ? '978…' : 'Ej.: Chainsaw Man 5';
-  $('#find-hint').textContent = mode === 'isbn' ? 'Los 13 dígitos que hay bajo el código de barras (o el ISBN de 10).' : 'Busca en Google Books y en Open Library. Incluye el número para afinar: «Berserk 3».';
+  input.placeholder = mode === 'isbn' ? '978… o 1234-5678' : 'Ej.: Chainsaw Man 5';
+  $('#find-hint').textContent = mode === 'isbn' ? 'Los 13 dígitos que hay bajo el código de barras, el ISBN de 10 o el ISSN de la revista (8 caracteres).' : 'Busca en Google Books y en Open Library. Incluye el número para afinar: «Berserk 3».';
   $('#find-results').innerHTML = mode === 'title' ? '<button class="btn wide" id="find-manual">Añadir a mano</button>' : '';
   openDialog($('#sheet-find'));
   setTimeout(() => input.focus(), 80);
@@ -988,8 +1060,9 @@ $('#find-form').addEventListener('submit', async (e) => {
   const q = $('#find-input').value.trim();
   if (!q) return;
   if (findMode === 'isbn') {
-    const code = normalizeIsbn(q) || (/^\d{13}$/.test(q.replace(/\D/g, '')) ? q.replace(/\D/g, '') : null);
-    if (!code) { $('#find-hint').textContent = 'Ese ISBN no es válido. Revisa los dígitos.'; return; }
+    const digits = q.replace(/[^0-9Xx]/g, '');
+    const code = normalizeIsbn(q) || eanFromIssn(q) || (/^\d{13}$/.test(digits) ? digits : null);
+    if (!code) { $('#find-hint').textContent = digits.length === 8 ? 'Ese ISSN no es válido. Revisa los dígitos.' : 'Ese ISBN no es válido. Revisa los dígitos.'; return; }
     await handleCode(code);
     return;
   }
@@ -1051,14 +1124,14 @@ $('#scan-photo').addEventListener('change', async (e) => {
   if (!file) return;
   scanner?.pause();
   status('Leyendo la foto…');
-  const code = await scanFile(file).catch(() => null);
-  if (!code) {
+  const hit = await scanFile(file).catch(() => null);
+  if (!hit) {
     status('No encuentro ningún código en la foto. Prueba con otra más cerca, recta y sin reflejos.');
     scanner?.resume();
     return;
   }
   flashHit();
-  await handleCode(code);
+  await handleCode(hit.code, { addon: hit.addon });
 });
 
 // ---------- Arranque ----------
@@ -1068,6 +1141,9 @@ async function init() {
     setGoogleKey(gkey || '');
     $('#google-key').value = gkey || '';
     state.comics = comics;
+    const fix = comics.filter((c) => /^977\d{10}$/.test(c.isbn || ''));
+    for (const c of fix) { c.issn = issnFromEan(c.isbn); c.barcode = c.isbn; c.isbn = ''; }
+    if (fix.length) await db.putMany('comics', fix);
     for (const s of series) state.seriesMeta.set(s.key, s);
     if (lastType) state.lastType = lastType;
     if (sort) { state.filters.sort = sort; $('#lib-sort').value = sort; }

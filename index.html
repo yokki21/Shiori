@@ -221,7 +221,8 @@
         <datalist id="publisher-options"></datalist>
         <label class="field"><span>Autores</span><input name="authors" autocomplete="off"></label>
         <div class="field-row">
-          <label class="field grow"><span>ISBN</span><input name="isbn" inputmode="numeric" autocomplete="off"></label>
+          <label class="field grow" id="isbn-field"><span>ISBN</span><input name="isbn" inputmode="numeric" autocomplete="off"></label>
+          <label class="field grow" id="issn-field" hidden><span>ISSN de la colección</span><input id="issn-value" readonly tabindex="-1"></label>
           <label class="field num"><span>Páginas</span><input name="pages" inputmode="numeric" autocomplete="off"></label>
         </div>
         <label class="field"><span>Notas</span><textarea name="notes" rows="3" placeholder="Edición, estado, dónde lo compraste…"></textarea></label>

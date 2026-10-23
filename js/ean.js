@@ -76,7 +76,50 @@ function decodeAt(runs, s) {
     digits += r.d; err += r.err;
   }
   const code = first + digits;
-  return isValidEan13(code) ? { code, err } : null;
+  if (!isValidEan13(code)) return null;
+  // Código pequeño a la derecha (2 o 5 cifras): en revistas y grapas, el número
+  const addon = s + 60 < runs.length ? decodeAddon(runs, s + 60, m) : null;
+  return { code, err, addon };
+}
+
+const ADDON5_PARITY = ['GGLLL', 'GLGLL', 'GLLGL', 'GLLLG', 'LGGLL', 'LLGGL', 'LLLGG', 'LGLGL', 'LGLLG', 'LLGLG'];
+
+function near(runs, i, m, target) {
+  const r = runs[i] / m;
+  return r > target * 0.45 && r < target * 1.9 + 0.4;
+}
+
+// a: índice de la primera barra del guarda del suplemento (1011)
+function decodeAddon(runs, a, m) {
+  const gap = runs[a - 1] / m; // separación respecto al código principal: 7–12 módulos
+  if (gap < 4 || gap > 18) return null;
+  if (a + 13 > runs.length) return null;
+  if (!near(runs, a, m, 1) || !near(runs, a + 1, m, 1) || !near(runs, a + 2, m, 2)) return null;
+  for (const n of [5, 2]) {
+    let idx = a + 3, digits = '', parity = '', ok = true;
+    for (let j = 0; j < n && ok; j++) {
+      if (idx + 4 > runs.length) { ok = false; break; }
+      const r = matchDigit(runs, idx, LEFT_SETS);
+      const w = r.tot / m;
+      if (r.err > 1.9 || w < 5 || w > 9) { ok = false; break; }
+      digits += r.d; parity += r.set; idx += 4;
+      if (j < n - 1) {
+        if (idx + 2 > runs.length || !near(runs, idx, m, 1) || !near(runs, idx + 1, m, 1)) { ok = false; break; }
+        idx += 2;
+      }
+    }
+    if (!ok) continue;
+    // Detrás tiene que venir margen en blanco (o el final de la línea)
+    if (idx < runs.length - 1 && runs[idx] < 2.5 * m) continue;
+    if (n === 2) {
+      if (['LL', 'LG', 'GL', 'GG'][+digits % 4] === parity) return digits;
+    } else {
+      const d = digits.split('').map(Number);
+      const chk = (3 * (d[0] + d[2] + d[4]) + 9 * (d[1] + d[3])) % 10;
+      if (ADDON5_PARITY[chk] === parity) return digits;
+    }
+  }
+  return null;
 }
 
 function decodeRuns(runs, firstDark) {
@@ -209,7 +252,16 @@ export function toGray(rgba, w, h) {
 // Busca un EAN-13 en una imagen en grises. Devuelve el código más votado.
 export function scanGray(gray, w, h, { lines = 24, horizontal = true, vertical = false } = {}) {
   const votes = new Map();
-  const vote = (r) => { if (r) votes.set(r.code, (votes.get(r.code) || 0) + 1); };
+  const addons = new Map(); // código → { suplemento: votos }
+  const vote = (r) => {
+    if (!r) return;
+    votes.set(r.code, (votes.get(r.code) || 0) + 1);
+    if (r.addon) {
+      const m = addons.get(r.code) || new Map();
+      m.set(r.addon, (m.get(r.addon) || 0) + 1);
+      addons.set(r.code, m);
+    }
+  };
   if (horizontal) {
     const buf = new Float32Array(w);
     for (let k = 1; k <= lines; k++) {
@@ -235,7 +287,10 @@ export function scanGray(gray, w, h, { lines = 24, horizontal = true, vertical =
   }
   let best = null, bestN = 0;
   for (const [code, n] of votes) if (n > bestN) { best = code; bestN = n; }
-  return best ? { code: best, votes: bestN } : null;
+  if (!best) return null;
+  let addon = null, aN = 0;
+  for (const [a, n] of addons.get(best) || []) if (n > aN) { addon = a; aN = n; }
+  return { code: best, votes: bestN, addon };
 }
 
 export function scanImageData(img, opts) {

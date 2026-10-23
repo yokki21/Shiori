@@ -39,6 +39,33 @@ export function normalizeIsbn(raw) {
 
 export const isIsbn = (code) => /^97[89]\d{10}$/.test(code);
 
+// ---------- ISSN (revistas y grapas: códigos 977…) ----------
+export const isIssnEan = (code) => /^977\d{10}$/.test(code);
+
+function issnCheck(seven) {
+  let sum = 0;
+  for (let i = 0; i < 7; i++) sum += +seven[i] * (8 - i);
+  const c = (11 - (sum % 11)) % 11;
+  return c === 10 ? 'X' : String(c);
+}
+
+// 977 + 7 cifras del ISSN + 2 de variante + control  →  "1234-5679"
+export function issnFromEan(code) {
+  const seven = code.slice(3, 10);
+  const full = seven + issnCheck(seven);
+  return `${full.slice(0, 4)}-${full.slice(4)}`;
+}
+
+// Acepta "1234-5679" (o sin guion) y devuelve el EAN 977 equivalente
+export function eanFromIssn(raw) {
+  const s = String(raw || '').replace(/[^0-9Xx]/g, '').toUpperCase();
+  if (s.length !== 8 || issnCheck(s.slice(0, 7)) !== s[7]) return null;
+  const core = '977' + s.slice(0, 7) + '00';
+  let t = 0;
+  for (let i = 0; i < 12; i++) t += +core[i] * (i % 2 ? 3 : 1);
+  return core + ((10 - (t % 10)) % 10);
+}
+
 async function getJson(url, ms = 9000) {
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), ms);
