@@ -95,6 +95,29 @@
       </section>
 
       <section class="view" id="view-settings" data-title="Ajustes" hidden>
+        <div class="panel" id="account-panel">
+          <h2>Cuenta</h2>
+          <p class="muted" id="account-off" hidden>Las cuentas todavía no están activadas en esta versión de Shiori.</p>
+          <form id="account-login" hidden novalidate>
+            <p class="muted">Con una cuenta, tu biblioteca se guarda en la nube: no se pierde si cambias de móvil o borras los datos, y se sincroniza entre tus dispositivos.</p>
+            <label class="field" style="margin-top:10px"><span>Correo</span><input type="email" id="acc-email" autocomplete="email" inputmode="email"></label>
+            <label class="field"><span>Contraseña (mínimo 6 caracteres)</span><input type="password" id="acc-pass" autocomplete="current-password"></label>
+            <div class="btn-row" style="margin-top:0">
+              <button class="btn primary" type="submit" data-act="in">Entrar</button>
+              <button class="btn" type="button" data-act="up">Crear cuenta</button>
+            </div>
+            <div class="btn-row">
+              <button class="btn small" type="button" data-act="google">Entrar con Google</button>
+              <button class="btn small" type="button" data-act="reset">He olvidado la contraseña</button>
+            </div>
+            <p class="small" id="acc-msg" aria-live="polite" style="margin-top:8px"></p>
+          </form>
+          <div id="account-in" hidden>
+            <p style="margin-top:4px">Conectado como <b id="acc-who"></b></p>
+            <p class="muted small" id="sync-status" aria-live="polite"></p>
+            <div class="btn-row"><button class="btn small" id="acc-out">Cerrar sesión</button></div>
+          </div>
+        </div>
         <div class="panel">
           <h2>Copia de seguridad</h2>
           <p class="muted">Tu biblioteca vive en este móvil. Guarda una copia de vez en cuando para no perderla si cambias de teléfono o borras los datos del navegador.</p>

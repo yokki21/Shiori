@@ -74,6 +74,31 @@ icons/                iconos
 - Las grapas de quiosco suelen llevar un código que no es ISBN (empieza por 977) y no se encuentran; se añaden a mano.
 - Google Books sin clave comparte una cuota global que suele estar agotada (error 429). Con una clave propia (gratis, 1.000 búsquedas al día) funciona bien: se añade en *Ajustes → Clave de Google Books* y se guarda solo en el dispositivo, nunca en el repositorio.
 
+## Cuentas y sincronización (Firebase)
+
+Con una cuenta, la biblioteca se guarda también en la nube y se sincroniza entre dispositivos. Se configura una vez:
+
+1. Entra en https://console.firebase.google.com y crea un proyecto (por ejemplo `shiori`). Google Analytics no hace falta.
+2. *Compilación → Authentication → Comenzar*. En *Método de acceso* activa **Correo electrónico/contraseña** (y **Google** si quieres).
+3. En *Authentication → Configuración → Dominios autorizados*, añade `yokki21.github.io`.
+4. *Compilación → Firestore Database → Crear base de datos*, ubicación `eur3 (Europe)`, modo producción. En la pestaña *Reglas* pega esto y pulsa *Publicar*:
+
+   ```
+   rules_version = '2';
+   service cloud.firestore {
+     match /databases/{database}/documents {
+       match /users/{uid}/{document=**} {
+         allow read, write: if request.auth != null && request.auth.uid == uid;
+       }
+     }
+   }
+   ```
+
+   Así cada usuario solo puede leer y escribir sus propios cómics.
+5. *Configuración del proyecto (rueda) → Tus apps → Web (`</>`)*, registra la app «Shiori» y copia el objeto `firebaseConfig` en `FIREBASE_CONFIG` de `js/config.js`. Esa configuración no es secreta.
+
+El plan gratuito (Spark) sobra para uso personal: 50.000 lecturas y 20.000 escrituras al día.
+
 ## Fuente extra: base de datos de libros editados en España
 
 La Agencia del ISBN (Ministerio de Cultura) tiene casi todos los tomos editados en España, con título exacto de la edición, editorial y precio. Su buscador no se puede consultar desde el navegador, así que hace falta un pequeño intermediario gratuito en Cloudflare (`worker/isbn-espana.js`):

@@ -1,4 +1,5 @@
 import { db, uid } from './db.js';
+import { initSync, syncAvailable, signIn, signUp, signInGoogle, resetPassword, signOutUser, authMessage, pushComic, pushDelete, pushSeries } from './sync.js';
 import { loadCatalog, catalogSeries, catalogIssue, catalogByIsbn, searchCatalog } from './catalog.js';
 import { Scanner, scanFile } from './scanner.js';
 import { lookupCode, searchTitle, normalizeIsbn, isIsbn, isIssnEan, issnFromEan, eanFromIssn, parseTitle, normalizePublisher, guessType, setGoogleKey, testGoogle } from './lookup.js';
@@ -12,6 +13,7 @@ const state = {
   scanDest: 'coleccion',
   burst: false,
   autoAdd: true,
+  deleted: {}, // id → fecha de borrado (para sincronizar borrados)
   lastType: 'manga',
   monthSel: null,
 };
@@ -153,15 +155,86 @@ async function saveComic(c) {
   await db.put('comics', c);
   const i = state.comics.findIndex((x) => x.id === c.id);
   if (i >= 0) state.comics[i] = c; else state.comics.push(c);
+  if (state.deleted[c.id]) { delete state.deleted[c.id]; db.setKv('deleted', state.deleted); }
+  pushComic(c);
   requestPersistence();
 }
 async function removeComic(id) {
   await db.del('comics', id);
   state.comics = state.comics.filter((c) => c.id !== id);
+  // Se recuerda el borrado para que no «resucite» al sincronizar con otro dispositivo
+  const at = Date.now();
+  state.deleted[id] = at;
+  db.setKv('deleted', state.deleted);
+  pushDelete(id, at);
 }
 async function saveSeriesMeta(meta) {
+  meta.updatedAt = Date.now();
   await db.put('series', meta);
   state.seriesMeta.set(meta.key, meta);
+  pushSeries(meta);
+}
+
+// ---------- Cuenta y nube ----------
+let renderTimer;
+const renderSoon = () => { clearTimeout(renderTimer); renderTimer = setTimeout(() => { render(); if ($('#sheet-series').open) renderSeriesSheet(); }, 120); };
+const syncHooks = {
+  getLocal: () => ({ comics: state.comics, series: state.seriesMeta, deleted: state.deleted }),
+  async applyComic(c) {
+    await db.put('comics', c);
+    const i = state.comics.findIndex((x) => x.id === c.id);
+    if (i >= 0) state.comics[i] = c; else state.comics.push(c);
+    if (state.deleted[c.id]) { delete state.deleted[c.id]; db.setKv('deleted', state.deleted); }
+    renderSoon();
+  },
+  async applyDelete(id) {
+    await db.del('comics', id);
+    state.comics = state.comics.filter((c) => c.id !== id);
+    renderSoon();
+  },
+  async applySeries(meta) {
+    await db.put('series', meta);
+    state.seriesMeta.set(meta.key, meta);
+    renderSoon();
+  },
+  onUser(u) {
+    $('#account-login').hidden = !!u;
+    $('#account-in').hidden = !u;
+    if (u) { $('#acc-who').textContent = u.email || u.displayName || 'tu cuenta'; $('#acc-pass').value = ''; }
+    else $('#sync-status').textContent = '';
+  },
+  onStatus(t) { $('#sync-status').textContent = t; },
+  onSynced({ down }) { if (down) toast(`Tu cuenta tenía ${plural(down, 'cambio', 'cambios')} y ya están en este dispositivo`); },
+};
+
+function setupAccountPanel() {
+  $('#account-off').hidden = syncAvailable;
+  $('#account-login').hidden = !syncAvailable;
+  const msg = (t, ok = false) => { const m = $('#acc-msg'); m.textContent = t; m.style.color = ok ? '' : 'var(--beni)'; };
+  $('#account-login').addEventListener('submit', (e) => e.preventDefault());
+  $('#account-login').addEventListener('click', async (e) => {
+    const act = e.target.closest('[data-act]')?.dataset.act;
+    if (!act) return;
+    const email = $('#acc-email').value.trim();
+    const pass = $('#acc-pass').value;
+    msg('');
+    try {
+      if (act === 'in') { await signIn(email, pass); toast('Sesión iniciada'); }
+      if (act === 'up') { await signUp(email, pass); toast('Cuenta creada. Tu biblioteca se está subiendo.'); }
+      if (act === 'google') { await signInGoogle(); toast('Sesión iniciada'); }
+      if (act === 'reset') {
+        if (!email) { msg('Escribe tu correo arriba y vuelve a pulsar.'); return; }
+        await resetPassword(email);
+        msg('Te he enviado un correo para cambiar la contraseña.', true);
+      }
+    } catch (err) {
+      msg(authMessage(err));
+    }
+  });
+  $('#acc-out').addEventListener('click', async () => {
+    await signOutUser();
+    toast('Sesión cerrada. Tu biblioteca sigue en este dispositivo.');
+  });
 }
 let persistAsked = false;
 function requestPersistence() {
@@ -631,14 +704,16 @@ $('#import-file').addEventListener('change', async (e) => {
     if (i >= 0) state.comics[i] = c; else state.comics.push(c);
   }
   await db.putMany('comics', merged);
+  for (const c of merged) pushComic(c);
   for (const s of data.series || []) if (s?.key) { await db.put('series', s); state.seriesMeta.set(s.key, s); }
   toast(`Importado: ${added} nuevos y ${updated} actualizados`);
   render();
 });
 $('#btn-wipe').addEventListener('click', async () => {
   if (!confirm('¿Borrar toda la biblioteca de este dispositivo? No se puede deshacer si no tienes una copia.')) return;
-  await db.clear('comics'); await db.clear('series');
-  state.comics = []; state.seriesMeta.clear();
+  for (const c of [...state.comics]) await removeComic(c.id);
+  await db.clear('series');
+  state.seriesMeta.clear();
   toast('Biblioteca borrada');
   render();
 });
@@ -1229,7 +1304,8 @@ $('#scan-photo').addEventListener('change', async (e) => {
 // ---------- Arranque ----------
 async function init() {
   try {
-    const [comics, series, lastType, sort, gkey, autoAdd] = await Promise.all([db.all('comics'), db.all('series'), db.getKv('lastType'), db.getKv('sort'), db.getKv('googleKey'), db.getKv('autoAdd')]);
+    const [comics, series, lastType, sort, gkey, autoAdd, deleted] = await Promise.all([db.all('comics'), db.all('series'), db.getKv('lastType'), db.getKv('sort'), db.getKv('googleKey'), db.getKv('autoAdd'), db.getKv('deleted')]);
+    state.deleted = deleted || {};
     state.autoAdd = autoAdd !== false;
     $('#auto-add').checked = state.autoAdd;
     setGoogleKey(gkey || '');
@@ -1245,6 +1321,8 @@ async function init() {
     toast('No se puede guardar en este navegador (¿modo privado?)');
   }
   loadCatalog();
+  setupAccountPanel();
+  initSync(syncHooks);
   showView('library');
   if (location.hash === '#scan') openScanner();
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
