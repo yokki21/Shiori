@@ -72,4 +72,14 @@ icons/                iconos
 
 - La cobertura de Google Books y Open Library para cómic español es buena pero no total: algunos tomos saldrán sin portada o sin datos. Una mejora futura sería consultar la base de datos del ISBN del Ministerio de Cultura a través de un pequeño servidor intermedio (desde el navegador no se puede por CORS).
 - Las grapas de quiosco suelen llevar un código que no es ISBN (empieza por 977) y no se encuentran; se añaden a mano.
-- Google Books limita las peticiones sin clave por IP. Para uso personal sobra; si algún día da errores, se puede añadir una API key gratuita en `js/lookup.js`.
+- Google Books sin clave comparte una cuota global que suele estar agotada (error 429). Con una clave propia (gratis, 1.000 búsquedas al día) funciona bien: se añade en *Ajustes → Clave de Google Books* y se guarda solo en el dispositivo, nunca en el repositorio.
+
+## Conseguir la clave de Google Books
+
+1. Entra en https://console.cloud.google.com/ y crea un proyecto (por ejemplo «Shiori»).
+2. En *APIs y servicios → Biblioteca*, busca **Books API** y pulsa *Habilitar*.
+3. En *APIs y servicios → Credenciales*, pulsa *Crear credenciales → Clave de API*.
+4. Edita la clave: en *Restricciones de aplicaciones* elige *Sitios web* y añade `https://yokki21.github.io/*`; en *Restricciones de API* elige solo *Books API*. Guarda.
+5. Copia la clave (empieza por `AIza`) y pégala en Shiori, en *Ajustes*. Pulsa *Guardar y probar*.
+
+No hace falta tarjeta ni facturación para la Books API.
