@@ -21,7 +21,7 @@ MANGA = os.path.join(HERE, 'panini_manga_prefixes.json')   # colecciones del lis
 BASE = 'https://www.panini.es'
 SITEMAP = BASE + '/media/shp_esp_es/comics-sitemap.xml'
 UA = 'ShioriCatalogo/1.0 (+https://github.com/yokki21/Shiori)'
-DELAY = 1.0
+DELAY = 2.0   # Panini corta a quien pide demasiado seguido
 MONTHS = {'ene': 1, 'feb': 2, 'mar': 3, 'abr': 4, 'may': 5, 'jun': 6, 'jul': 7, 'ago': 8, 'sep': 9, 'sept': 9, 'oct': 10, 'nov': 11, 'dic': 12}
 
 
@@ -129,7 +129,7 @@ def main():
     todo = known_new + unknown_new + soon
     print(f'nuevas: {len(known_new)} de colecciones conocidas, {len(unknown_new)} por comprobar; a refrescar: {len(soon)}', file=sys.stderr)
 
-    added = updated = skipped = 0
+    added = updated = skipped = blocked = 0
     for s in todo[:limit]:
         slug = entries.get(s) or (rows[s][col['slug']] if s in rows else None)
         if not slug:
@@ -139,6 +139,16 @@ def main():
         if not h:
             continue
         p = parse_page(h)
+        if not p['title'] or 'pnn_release_date' not in h:
+            # Página sin la ficha: casi siempre el control anti-robots de la tienda. No se descarta nada;
+            # tras varias seguidas se para y la próxima pasada sigue por aquí.
+            blocked += 1
+            if blocked >= 5:
+                print('La tienda ha dejado de servir fichas; se sigue en la próxima pasada.', file=sys.stderr)
+                break
+            time.sleep(30)
+            continue
+        blocked = 0
         if s in rows:   # refresco
             r = rows[s]
             for k, v in (('ptitle', p['title']), ('pdate', p['date']), ('pages', p['pages']), ('authors', p['authors']),
@@ -151,10 +161,6 @@ def main():
             updated += 1
             continue
         cat = category(p, pre(s), manga_prefixes)
-        if not p['title']:
-            skip.add(s)
-            skipped += 1
-            continue
         r = [None] * len(K)
         for k, v in (('sku', s), ('slug', slug), ('title', p['title']), ('price', p['price']), ('date', ''), ('cat', cat),
                      ('img', p['img']), ('code', None), ('addon', None), ('listed', p['listed']), ('ptitle', p['title']),
