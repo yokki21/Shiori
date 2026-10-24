@@ -266,7 +266,7 @@ $('#add-form').addEventListener('submit', async (e) => {
   const seen = new Set(local.map((r) => r.isbn).filter(Boolean));
   results = [...local, ...remote.filter((r) => !r.isbn || !seen.has(r.isbn))].slice(0, 30);
   box.innerHTML = (results.length
-    ? results.map((r, i) => `<button class="row" data-r="${i}">${coverHTML(r)}<span class="row-main"><b>${esc(r.title)}</b><span>${esc([r.publisher, r.price != null ? euro(r.price) : '', r.publishedDate?.slice(0, 4)].filter(Boolean).join(' · '))}</span></span><span class="row-add">Añadir</span></button>`).join('')
+    ? results.map((r, i) => `<button class="row" data-r="${i}">${coverHTML(r)}<span class="row-main"><b>${esc(r.title)}</b><span>${esc([r.publisher, r.price != null ? euro(r.price) : '', r.publishedDate?.slice(0, 4)].filter(Boolean).join(', '))}</span></span><span class="row-add">Añadir</span></button>`).join('')
     : '<p class="muted">Sin resultados.</p>') + '<button class="btn wide" id="add-manual">No está: añadir a mano</button>';
 });
 

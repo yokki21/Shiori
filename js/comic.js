@@ -36,7 +36,6 @@ function renderDetail() {
     ['Autores', c.authors],
     ['Páginas', c.pages],
     [c.issn ? 'ISSN' : 'ISBN', c.issn || c.isbn],
-    ['Leído el', read ? fmtDate(c.readAt) : ''],
   ].filter(([, v]) => v);
   $('#detail-heading').textContent = c.series || 'Cómic';
   $('#detail-body').innerHTML = `
@@ -44,9 +43,9 @@ function renderDetail() {
       <div class="detail-cover">${coverHTML(c, { lazy: false })}</div>
       <div class="detail-head">
         <h3>${esc(c.title)}</h3>
-        ${c.series ? `<button class="link" id="detail-series">${esc(c.series)}${c.number != null ? ` · nº ${esc(c.number)}` : ''}</button>` : ''}
+        ${c.series ? `<button class="link" id="detail-series">${esc(c.series)}${c.number != null ? `, nº ${esc(c.number)}` : ''}</button>` : ''}
         <button class="read-toggle${read ? ' is-read' : ''}" id="detail-read" aria-pressed="${read}">
-          <svg aria-hidden="true"><use href="#i-check"/></svg><span>${read ? 'Leído' : 'Marcar como leído'}</span>
+          <span class="stamp" lang="ja" aria-hidden="true">済</span><span>${read ? `Leído${c.readAt ? ` el ${esc(fmtDate(c.readAt))}` : ''}` : 'Marcar como leído'}</span>
         </button>
       </div>
     </div>

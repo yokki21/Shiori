@@ -11,9 +11,9 @@ import { renderSeries, renderSeriesSheet, setupSeries, openSeries } from './view
 import { renderProfile, renderSettings, renderAccount, setupProfile } from './views/profile.js';
 
 const VIEWS = {
-  library: { title: 'Biblioteca', render: renderLibrary },
-  series: { title: 'Series', render: renderSeries },
-  profile: { title: 'Perfil', render: () => { renderProfile(); renderSettings(); } },
+  library: { title: 'Biblioteca', tag: '本棚', render: renderLibrary },
+  series: { title: 'Series', tag: '全巻', render: renderSeries },
+  profile: { title: 'Perfil', tag: '記録', render: () => { renderProfile(); renderSettings(); } },
 };
 let current = 'library';
 
@@ -26,6 +26,7 @@ function showView(name) {
     if (on) t.setAttribute('aria-current', 'page'); else t.removeAttribute('aria-current');
   });
   $('#screen-title').textContent = VIEWS[name].title;
+  $('#screen-tag').textContent = VIEWS[name].tag;   // etiqueta de la balda: estantería, colección completa, registro
   VIEWS[name].render();
   window.scrollTo({ top: 0 });
 }

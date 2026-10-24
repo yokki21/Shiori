@@ -18,7 +18,7 @@ export function renderSeries() {
   const box = $('#series-list');
   $('#series-count').textContent = list.length ? plural(list.length, 'serie', 'series') : '';
   if (!list.length) {
-    box.innerHTML = `<div class="empty"><h2>Aún no hay series</h2><p>Cuando añadas cómics con número (Absolute Batman 3, One Piece 12…) se agrupan aquí y verás cuáles te faltan.</p></div>`;
+    box.innerHTML = `<div class="empty"><div class="seal-big" lang="ja" aria-hidden="true">巻</div><h2>Aún no hay series</h2><p>Cuando añadas cómics con número (Absolute Batman 3, One Piece 12…) se agrupan aquí y verás cuáles te faltan.</p></div>`;
     return;
   }
   box.innerHTML = list.map((g) => {
@@ -29,9 +29,10 @@ export function renderSeries() {
       <div class="series-thumb">${coverHTML(g.cover)}</div>
       <div class="series-info">
         <h3>${esc(g.name)}</h3>
-        <p class="meta">Tienes ${g.owned}${of}${g.missing.length ? ` · <b>te faltan ${g.missing.length}</b>` : ''}</p>
-        <div class="bar" role="img" aria-label="${pct}% de la serie"><i style="width:${pct}%"></i></div>
-        <p class="cost${g.complete ? ' done' : ''}">${esc(costText(g))}</p>
+        <p class="meta">Tienes ${g.owned}${of}${g.missing.length ? `, <b>te faltan ${g.missing.length}</b>` : ''}</p>
+        <div class="obi${g.complete || !g.missing.length ? ' done' : ''}" role="img" aria-label="${pct}% de la serie. ${esc(costText(g))}">
+          <span>${esc(costText(g)) || `${pct}%`}</span><i style="width:${pct}%"><span>${esc(costText(g)) || `${pct}%`}</span></i>
+        </div>
       </div>
     </button>`;
   }).join('');
@@ -56,7 +57,7 @@ export function renderSeriesSheet() {
   for (let n = 1; n <= g.max; n++) {
     const c = g.byNum.get(n);
     if (c) {
-      cells.push(`<button class="vol own${c.reading === 'leido' ? ' read' : ''}" data-id="${esc(c.id)}" aria-label="Nº ${n}, lo tienes${c.reading === 'leido' ? ', leído' : ''}">${coverHTML(c)}<span class="vol-n">${n}</span>${c.reading === 'leido' ? '<span class="mark-read"><svg><use href="#i-check"/></svg></span>' : ''}</button>`);
+      cells.push(`<button class="vol own${c.reading === 'leido' ? ' read' : ''}" data-id="${esc(c.id)}" aria-label="Nº ${n}, lo tienes${c.reading === 'leido' ? ', leído' : ''}">${coverHTML(c)}<span class="vol-n">${n}</span>${c.reading === 'leido' ? '<span class="mark-read" title="Leído" lang="ja">済</span>' : ''}</button>`);
     } else {
       const it = g.cat ? catalogIssue(g.cat, n) : null;
       cells.push(`<button class="vol miss" data-n="${n}" aria-label="Nº ${n}, te falta">${coverHTML(it || { series: g.name, number: n })}<span class="vol-n">${n}</span>${it?.price != null ? `<span class="vol-price">${euro(it.price)}</span>` : ''}</button>`);
@@ -73,7 +74,7 @@ export function renderSeriesSheet() {
     ${g.missing.length ? `<p class="muted small">Te faltan los números ${ranges(g.missing)}.${g.costEstimated ? ' El precio es aproximado: donde no conozco el precio uso la media de lo que has pagado.' : ''} Toca uno que tengas para añadirlo.</p>` : ''}
     ${!g.knownTotal && !g.cat ? '<p class="muted small">No sé cuántos números tiene esta serie: indícalo abajo para ver también los que faltan al final.</p>' : ''}
     <div class="vols">${cells.join('')}</div>
-    <p class="muted small">Has gastado ${euro(g.spent)} en esta serie${g.publisher ? ` · ${esc(g.publisher)}` : ''}.</p>
+    <p class="muted small">Has gastado ${euro(g.spent)} en esta serie${g.publisher ? ` de ${esc(g.publisher)}` : ''}.</p>
     <details class="series-edit">
       <summary>Datos de la serie</summary>
       <div class="series-form">

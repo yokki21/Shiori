@@ -32,7 +32,7 @@ export function renderLibrary() {
   $('#lib-tools').hidden = !all.length;
   const grid = $('#lib-grid');
   if (!all.length) {
-    grid.innerHTML = `<div class="empty"><h2>Tu estantería está vacía</h2><p>Escanea el código de barras de la contraportada y el cómic se añade solo, con portada y todo.</p><button class="btn primary" data-action="scan">Escanear mi primer cómic</button></div>`;
+    grid.innerHTML = `<div class="empty"><div class="seal-big" lang="ja" aria-hidden="true">棚</div><h2>Tu estantería está vacía</h2><p>Escanea el código de barras de la contraportada y el cómic se añade solo, con portada y todo.</p><button class="btn primary" data-action="scan">Escanear mi primer cómic</button></div>`;
     return;
   }
   if (!list.length) {
@@ -51,7 +51,8 @@ function more() {
   const slice = list.slice(shown, shown + PAGE);
   grid.insertAdjacentHTML('beforeend', slice.map((c) => `
     <button class="book" data-id="${esc(c.id)}">
-      <div class="book-art">${coverHTML(c)}${c.reading === 'leido' ? '<span class="mark-read" title="Leído"><svg><use href="#i-check"/></svg></span>' : ''}</div>
+      <div class="book-art">${coverHTML(c)}${c.reading === 'leido' ? '<span class="mark-read" title="Leído" lang="ja">済</span>' : ''}</div>
+      <i class="ledge" aria-hidden="true"></i>
       <span class="cap">${esc(c.title || c.series || 'Sin título')}</span>
     </button>`).join(''));
   shown += slice.length;

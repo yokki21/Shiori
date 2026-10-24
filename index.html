@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Shiori</title>
   <meta name="description" content="Tu colección de cómics y manga: escanea, organiza y lleva la cuenta.">
-  <meta name="theme-color" content="#F3F4F8" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#14161D" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#ECEEEB" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#151922" media="(prefers-color-scheme: dark)">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -16,7 +16,7 @@
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Mincho+B1:wght@500;700;800&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap">
   <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
@@ -40,6 +40,7 @@
   <div class="app">
     <header class="topbar">
       <h1 id="screen-title">Biblioteca</h1>
+      <span class="tanafuda" id="screen-tag" lang="ja" aria-hidden="true">本棚</span>
     </header>
 
     <main>
@@ -106,14 +107,14 @@
           <p class="muted small">Quita tus cómics de este móvil. Si tienes cuenta, siguen guardados en ella.</p>
           <div class="btn-row"><button class="btn small danger" id="btn-wipe">Borrar datos de este dispositivo</button></div>
         </div>
-        <p class="muted small center about">Shiori 2.0 · Datos de Panini, Google Books y Open Library</p>
+        <p class="small center about">Shiori 栞 — datos de Panini, Google Books y Open Library</p>
       </section>
     </main>
 
     <nav class="tabbar" aria-label="Secciones">
       <button class="tab on" data-view="library" aria-current="page"><svg aria-hidden="true"><use href="#i-shelf"/></svg><span>Biblioteca</span></button>
       <button class="tab" data-view="series"><svg aria-hidden="true"><use href="#i-series"/></svg><span>Series</span></button>
-      <button class="scan-ribbon" id="btn-scan" aria-label="Escanear código de barras"><svg aria-hidden="true"><use href="#i-barcode"/></svg><span>Escanear</span></button>
+      <button class="hanko" id="btn-scan" aria-label="Escanear código de barras"><span class="seal" lang="ja" aria-hidden="true">読</span><span class="lbl">Escanear</span></button>
       <button class="tab" id="btn-add"><svg aria-hidden="true"><use href="#i-plus"/></svg><span>Añadir</span></button>
       <button class="tab" data-view="profile"><svg aria-hidden="true"><use href="#i-user"/></svg><span>Perfil</span></button>
     </nav>

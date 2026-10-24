@@ -63,7 +63,7 @@ export function renderProfile() {
 
   const box = $('#profile-stats');
   if (!s.own.length) {
-    box.innerHTML = `<div class="empty"><h2>Sin datos todavía</h2><p>Cuando escanees tus cómics verás aquí cuánto llevas invertido, cuánto has leído y lo que te falta.</p></div>`;
+    box.innerHTML = `<div class="empty"><div class="seal-big" lang="ja" aria-hidden="true">記</div><h2>Sin datos todavía</h2><p>Cuando escanees tus cómics verás aquí cuánto llevas invertido, cuánto has leído y lo que te falta.</p></div>`;
     return;
   }
   const maxSum = Math.max(...s.months.map((x) => x.sum), 0.01);
@@ -77,13 +77,14 @@ export function renderProfile() {
   const pctRead = Math.round((s.read / s.own.length) * 100);
 
   box.innerHTML = `
-    <div class="kpis">
-      <div class="kpi"><div class="v">${s.own.length}</div><div class="l">${s.own.length === 1 ? 'cómic' : 'cómics'}</div></div>
-      <div class="kpi"><div class="v">${euroShort(s.spent)}</div><div class="l">invertido</div></div>
-      <div class="kpi"><div class="v">${pctRead}%</div><div class="l">leído (${s.read})</div></div>
-      <div class="kpi"><div class="v">${s.groups.length}</div><div class="l">${s.groups.length === 1 ? 'serie' : 'series'}${s.complete ? `, ${s.complete} completa${s.complete === 1 ? '' : 's'}` : ''}</div></div>
-      <div class="kpi"><div class="v">${s.toComplete ? `${s.approx ? '≈' : ''}${euroShort(s.toComplete)}` : '—'}</div><div class="l">para completar tus series</div></div>
-      <div class="kpi"><div class="v">${euroShort(s.yearSpent)}</div><div class="l">en ${s.year} (${s.yearN})</div></div>
+    <div class="receipt kpis">
+      <div class="receipt-head"><b>Shiori 栞</b><span>${esc(new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }))}</span></div>
+      <div class="rc"><span class="l">${s.own.length === 1 ? 'Cómic' : 'Cómics'}</span><i class="dots"></i><b class="v">${s.own.length}</b></div>
+      <div class="rc"><span class="l">Leídos</span><i class="dots"></i><b class="v">${s.read} (${pctRead}%)</b></div>
+      <div class="rc"><span class="l">${s.groups.length === 1 ? 'Serie' : 'Series'}${s.complete ? ` (${s.complete} completa${s.complete === 1 ? '' : 's'})` : ''}</span><i class="dots"></i><b class="v">${s.groups.length}</b></div>
+      <div class="rc"><span class="l">Gastado en ${s.year}</span><i class="dots"></i><b class="v">${euroShort(s.yearSpent)}</b></div>
+      <div class="rc"><span class="l">Completar tus series</span><i class="dots"></i><b class="v">${s.toComplete ? `${s.approx ? '≈ ' : ''}${euroShort(s.toComplete)}` : '—'}</b></div>
+      <div class="rc total"><span class="l">Total invertido</span><i class="dots"></i><b class="v">${euroShort(s.spent)}</b></div>
     </div>
 
     <section class="stat-block">

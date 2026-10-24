@@ -177,7 +177,7 @@ async def main():
         print('Perfil')
         await pg.click('.tab[data-view=profile]'); await pg.wait_for_timeout(300)
         kpis = await pg.inner_text('.kpis')
-        check('8' in kpis and 'invertido' in kpis and 'para completar' in kpis, f'estadísticas: {kpis!r}')
+        check('8' in kpis and 'invertido' in kpis and 'Completar tus series' in kpis, f'estadísticas: {kpis!r}')
         check(not await pg.locator('#open-account').count(), 'sin Firebase configurado no ofrece cuenta')
 
         print('Copia de seguridad')
