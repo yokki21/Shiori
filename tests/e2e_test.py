@@ -191,6 +191,20 @@ async def main():
         check(await pg.evaluate('shiori.state.comics.length') == 0, 'borrar este dispositivo')
         await pg.set_input_files('#import-file', older_path.replace('vieja', 'vieja')); await pg.wait_for_selector('#sheet-confirm[open]'); await pg.click('#confirm-ok'); await pg.wait_for_timeout(400)
         check(await pg.evaluate('shiori.state.comics.length') == 8, 'importar una copia en un dispositivo vacío')
+
+        print('Catálogo de Panini')
+        # El suplemento numera la colección ISSN: el 00021 de 2938-5199 es «Capitán América 4»
+        await pg.evaluate("shiori.handleCode('9772938519008', {addon: '00021'})"); await pg.wait_for_timeout(400)
+        check(await pg.evaluate("shiori.state.comics.some(c => c.series === 'Capitán América' && c.number === 4)"), 'grapa cuyo suplemento sigue otra numeración')
+        await pg.evaluate("shiori.handleCode('9772938519008', {addon: '00021'})"); await pg.wait_for_timeout(300)
+        check(await pg.evaluate("shiori.state.comics.filter(c => c.series === 'Capitán América').length") == 1, 'escanearla otra vez no la duplica')
+        # Tomo por ISBN con serie y número
+        await pg.evaluate("shiori.handleCode('9788411503358')"); await pg.wait_for_timeout(400)
+        check(await pg.evaluate("shiori.state.comics.some(c => c.isbn === '9788411503358' && c.series && c.number)"), 'tomo de Panini por ISBN, con serie y número')
+        await pg.click('#btn-add'); await pg.fill('#add-input', 'lobezno 3'); await pg.press('#add-input', 'Enter'); await pg.wait_for_timeout(500)
+        first = await pg.inner_text('#add-results .row >> nth=0 >> b')
+        check(first == 'Lobezno 3', f'buscar por título en el catálogo: {first!r}')
+        await pg.keyboard.press('Escape')
         check(not pg.errors, f'sin errores ({pg.errors})')
         await ctx.close()
 

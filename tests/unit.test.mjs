@@ -110,3 +110,40 @@ test('nombres de editorial normalizados', () => {
   assert.equal(normalizePublisher('Norma Editorial S.A.'), 'Norma Editorial');
   assert.equal(normalizePublisher('Editorial Ivrea'), 'Ivrea');
 });
+
+test('catálogo: portadas, ISBN, ISSN y búsqueda', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const json = JSON.parse(await readFile(new URL('../catalog/catalog.json', import.meta.url)));
+  globalThis.fetch = async () => ({ ok: true, json: async () => json });
+  const cat = await import('../js/catalog.js');
+  await cat.loadCatalog();
+  const mm = cat.catalogSeries('3081-6009');
+  assert.equal(mm?.name, 'Absolute Martian Manhunter');
+  const it = cat.catalogIssue(mm, 1);
+  assert.equal(it.number, 1);
+  assert.match(it.cover, /^https:\/\/www\.panini\.es\/media\/catalog\/product\/.+\?quality=/);
+  // Cada ISBN del catálogo se encuentra y trae su serie y número cuando los tiene
+  const withIsbn = json.series.flatMap((s) => Object.entries(s.issues).filter(([, i]) => i.isbn).map(([n, i]) => [s.name, +n, i.isbn]));
+  assert.ok(withIsbn.length > 500, `tomos con ISBN: ${withIsbn.length}`);
+  for (const [name, n, isbn] of withIsbn.slice(0, 200)) {
+    const r = cat.catalogByIsbn(isbn);
+    assert.equal(r.series, name); assert.equal(r.number, n); assert.equal(r.isbn, isbn);
+  }
+  // Ningún ISBN repetido en dos fichas distintas
+  const all = [...withIsbn.map((x) => x[2]), ...json.extras.filter((e) => e.isbn).map((e) => e.isbn)];
+  assert.equal(new Set(all).size, all.length, 'ISBN repetidos');
+  // Grapas: ISSN + suplemento -> el número de la serie (aunque el suplemento siga otra numeración)
+  assert.equal(cat.catalogByIssue('3081-6009', 12)?.title, 'Absolute Martian Manhunter 12');
+  let checked = 0;
+  for (const s of json.series) {
+    for (const [n, i] of Object.entries(s.issues)) {
+      const issn = i.issn || s.issn;
+      if (!issn || i.a == null) continue;
+      const r = cat.catalogByIssue(issn, i.a);
+      if (r?.series === s.name) { assert.equal(r.number, +n); checked++; }
+    }
+  }
+  assert.ok(checked > 0, 'hay grapas con suplemento distinto del número');
+  const found = cat.searchCatalog('martian manhunter 3');
+  assert.ok(found.some((r) => r.title === 'Absolute Martian Manhunter 3'), JSON.stringify(found.map((r) => r.title)));
+});

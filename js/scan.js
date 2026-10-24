@@ -1,10 +1,10 @@
 // Escanear y añadir: cámara, código escrito, foto y búsqueda por título.
 
-import { $, esc, euro, coverHTML, toast, haptic, openDialog, closeAllLayers, pushLayer, closeTopLayer } from './util.js';
+import { $, esc, euro, seriesKey, coverHTML, toast, haptic, openDialog, closeAllLayers, pushLayer, closeTopLayer } from './util.js';
 import { state, byIsbn, byIssue, saveComic, removeComic } from './store.js';
 import { Scanner, scanFile } from './scanner.js';
 import { lookupCode, searchTitle, normalizeIsbn, isIsbn, isIssnEan, issnFromEan, eanFromIssn } from './lookup.js';
-import { loadCatalog, catalogSeries, catalogIssue, catalogByIsbn, searchCatalog } from './catalog.js';
+import { loadCatalog, catalogSeries, catalogIssue, catalogByIsbn, catalogByIssue, catalogAddons, catalogNextIssue, searchCatalog } from './catalog.js';
 import { openDetail, openEditor, newDraft, commitDraft } from './comic.js';
 
 const scanEl = $('#scanner');
@@ -159,22 +159,39 @@ function issueFromAddon(addon, nums) {
   return n > 0 ? n : null;
 }
 
+// Cómic que ya tienes con la misma serie y número (o el mismo ISBN)
+function ownedLike(it) {
+  if (it.isbn && byIsbn(it.isbn)) return byIsbn(it.isbn);
+  const k = seriesKey(it.series || '');
+  return state.comics.find((c) => c.status !== 'deseo' && c.number === it.number && k && seriesKey(c.series || '') === k) || null;
+}
+
 async function handleIssn(code, addon) {
   const issn = issnFromEan(code);
-  const cat = catalogSeries(issn);
   const mine = state.comics.filter((c) => c.issn === issn && c.status !== 'deseo');
-  const n = issueFromAddon(addon, mine.map((c) => c.number).filter((x) => x != null));
+  const n = issueFromAddon(addon, [...catalogAddons(issn), ...mine.map((c) => c.number).filter((x) => x != null)]);
 
+  // 1. El catálogo sabe qué cómic es ese número de la colección
+  const it = n != null ? catalogByIssue(issn, n) : null;
+  if (it) {
+    const have = ownedLike(it);
+    if (have) return announceExisting(have);
+    return add({ ...it, issn, barcode: code, addon });
+  }
   if (n != null) {
     const existing = byIssue(issn, n);
     if (existing) return announceExisting(existing);
+    // Un número nuevo que aún no está en el catálogo: se deduce de los anteriores
+    const next = catalogNextIssue(issn, n);
+    if (next) {
+      const have = ownedLike(next);
+      return have ? announceExisting(have) : add({ ...next, barcode: code, addon });
+    }
   }
-  if (cat) {
-    const it = n != null ? catalogIssue(cat, n) : null;
-    if (it) return add({ ...it, issn, barcode: code, addon });
-    return openIssuePicker(cat, code); // número sin leer: se elige por portada
-  }
-  // Colección que no está en el catálogo: se aprende de los números que ya tienes
+  // 2. Colección conocida pero número sin leer (o que aún no está en el catálogo): se elige por portada
+  const cat = catalogSeries(issn);
+  if (cat) return openIssuePicker(cat, code);
+  // 3. Colección que no está en el catálogo: se aprende de los números que ya tienes
   const ref = mine.find((c) => c.series);
   if (ref && n != null) {
     return add({ title: `${ref.series} ${n}`, series: ref.series, number: n, publisher: ref.publisher, type: ref.type, price: ref.price, issn, barcode: code, addon });
@@ -195,13 +212,15 @@ function openIssuePicker(cat, code) {
   closeAllLayers();
   picking = { cat, code };
   $('#pick-heading').textContent = cat.name;
+  // En las series largas, primero los más recientes (lo más probable al escanear una grapa nueva)
   const nums = Object.keys(cat.issues).map(Number).sort((a, b) => a - b);
+  if (nums.length > 24) nums.reverse();
   $('#pick-body').innerHTML = `
     <p class="muted">No he podido leer el número. Toca el que tienes.</p>
     <div class="pick-grid">${nums.map((n) => {
       const it = catalogIssue(cat, n);
-      const have = byIssue(cat.issn, n);
-      return `<button class="pick${have ? ' owned' : ''}" data-n="${n}">${coverHTML(it)}<span class="cap">Nº ${n}</span>${have ? '<span class="have">Lo tienes</span>' : ''}</button>`;
+      const have = ownedLike(it);
+      return `<button class="pick${have ? ' owned' : ''}" data-n="${n}">${coverHTML(it, { lazy: true })}<span class="cap">Nº ${n}</span>${have ? '<span class="have">Lo tienes</span>' : ''}</button>`;
     }).join('')}</div>`;
   openDialog($('#sheet-pick'));
 }
@@ -209,10 +228,10 @@ $('#pick-body').addEventListener('click', async (e) => {
   const b = e.target.closest('.pick');
   if (!b || !picking) return;
   const { cat, code } = picking;
-  const n = +b.dataset.n;
-  const have = byIssue(cat.issn, n);
+  const it = catalogIssue(cat, +b.dataset.n);
+  const have = ownedLike(it);
   if (have) { closeAllLayers(); openDetail(have); return; }
-  await add({ ...catalogIssue(cat, n), issn: cat.issn, barcode: code || cat.ean });
+  await add({ ...it, barcode: code || it.barcode });
 });
 
 // ---------- Añadir: un buscador para título, ISBN o ISSN ----------
@@ -262,7 +281,7 @@ $('#add-results').addEventListener('click', async (e) => {
   if (!b) return;
   let r = results[+b.dataset.r];
   if (r.isbn && byIsbn(r.isbn)) return announceExisting(byIsbn(r.isbn));
-  if (r.issn && r.number != null && byIssue(r.issn, r.number)) return announceExisting(byIssue(r.issn, r.number));
+  if (r.fromCatalog && r.series && r.number != null && ownedLike(r)) return announceExisting(ownedLike(r));
   if (r.needsLookup && r.isbn) {
     b.classList.add('busy');
     const res = await lookupCode(r.isbn);
