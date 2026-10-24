@@ -210,7 +210,11 @@ async def main():
         await pg.click('#new-list .row-add >> nth=0'); await pg.wait_for_timeout(400)
         check(await pg.evaluate("shiori.state.comics.filter(c => c.status === 'deseo').length") == n0 + 1, 'desde novedades se añade a deseados')
         await pg.click('#new-filters [data-line="DC"]'); await pg.wait_for_timeout(300)
-        check('Marvel' not in await pg.inner_text('#new-list .rel >> nth=-1'), 'filtro por editorial')
+        check('Marvel' not in await pg.inner_text('#new-list .rel >> nth=-1'), 'filtro por línea')
+        await pg.click('#new-filters [data-line=""]'); await pg.click('#new-pubs [data-pub="Planeta Cómic"]'); await pg.wait_for_timeout(300)
+        rows = await pg.evaluate("[...document.querySelectorAll('#new-list .rel .row-main span')].map(e => e.textContent)")
+        check(all('Planeta Cómic' in r for r in rows), f'filtro por editorial: {len(rows)} de Planeta')
+        await pg.click('#new-pubs [data-pub=""]'); await pg.wait_for_timeout(200)
         await pg.click('.tab[data-view=wish]'); await pg.wait_for_timeout(200)
         await pg.fill('#wish-input', 'absolute flash'); await pg.wait_for_timeout(700)
         await pg.click('#wish-results .series-row .row-add'); await pg.wait_for_timeout(800)
@@ -231,6 +235,11 @@ async def main():
         check(first == '[4,"2025-12-24"]', f'nota propia y fecha de compra editable: {first}')
         check(await pg.locator('#sheet-detail .ext').count() == 3, 'enlaces a notas en otras plataformas')
         await pg.keyboard.press('Escape'); await pg.wait_for_timeout(300)
+
+        print('Catálogo de Planeta Cómic')
+        await pg.evaluate("shiori.handleCode('9788468471525')"); await pg.wait_for_timeout(400)
+        op = await pg.evaluate("JSON.stringify(shiori.state.comics.filter(c => c.isbn === '9788468471525').map(c => [c.series, c.number, c.publisher, (c.cover || '').slice(0, 40)]))")
+        check('"One Piece",1,"Planeta Cómic","https://proassets.planetadelibros.com' in op, f'tomo de Planeta por ISBN, con serie, número y portada: {op}')
 
         print('Catálogo de Panini')
         # El suplemento numera la colección ISSN: el 00021 de 2938-5199 es «Capitán América 4»

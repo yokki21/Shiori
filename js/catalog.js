@@ -22,7 +22,12 @@ const key = (s) => fold(s).replace(/[^a-z0-9]+/g, ' ').trim();
 const fold = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
   .replace(/\b(?:[a-z0-9]\.){2,}[a-z0-9]?\.?/g, (m) => m.replace(/\./g, ''));
 
-const coverUrl = (c) => (!c || /^https?:/.test(c) ? c || null : `${data.img || ''}${c}${data.imgq || ''}`);
+const coverUrl = (c) => {
+  if (!c || /^https?:/.test(c)) return c || null;
+  const m = /^([a-z]+):(.*)$/.exec(c);   // "pl:57/m_libros/x.jpg": portada de otra editorial (data.imgs)
+  if (m && data.imgs?.[m[1]]) return data.imgs[m[1]] + m[2];
+  return `${data.img || ''}${c}${data.imgq || ''}`;
+};
 
 export function loadCatalog() {
   if (!loading) {

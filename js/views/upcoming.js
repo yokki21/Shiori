@@ -1,4 +1,4 @@
-// Próximas novedades: lo que Panini aún no ha sacado, según las fechas del catálogo.
+// Próximas novedades: lo que las editoriales del catálogo aún no han sacado, según las fechas del catálogo.
 // Primero lo que te toca (números de tus series y lo que tienes en deseados) y después todo lo demás,
 // agrupado por día de salida.
 
@@ -9,6 +9,7 @@ import { addWish, findAny } from './wish.js';
 
 const DAYS = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
 let line = '';
+let pub = '';
 let shown = [];
 
 function dayParts(iso) {
@@ -26,7 +27,7 @@ function relation(u) {
 export function renderUpcoming() {
   const list = $('#new-list');
   if (!catalogLoaded()) { list.innerHTML = '<div class="spinner"></div>'; loadCatalog().then(renderUpcoming); return; }
-  const all = catalogUpcoming().filter((u) => !line || u.line === line);
+  const all = catalogUpcoming().filter((u) => (!line || u.line === line) && (!pub || u.item.publisher === pub));
   // Tus series: las de la colección y las de deseados (por nombre de serie)
   const mine = new Set([...owned(), ...wanted()].map((c) => seriesKey(c.series || '')).filter(Boolean));
   const yours = [];
@@ -38,7 +39,7 @@ export function renderUpcoming() {
   }
   shown = [...yours, ...rest];
   if (!all.length) {
-    list.innerHTML = `<div class="empty"><div class="seal-big" lang="ja" aria-hidden="true">新</div><h2>Sin novedades anunciadas</h2><p>Cuando Panini anuncie nuevas salidas aparecerán aquí. El catálogo se actualiza cada lunes.</p></div>`;
+    list.innerHTML = `<div class="empty"><div class="seal-big" lang="ja" aria-hidden="true">新</div><h2>Sin novedades anunciadas</h2><p>Cuando las editoriales anuncien nuevas salidas aparecerán aquí. El catálogo se actualiza cada lunes.</p></div>`;
     return;
   }
   // La fecha solo en el primer cómic de cada día, como en un calendario de salidas
@@ -53,7 +54,7 @@ export function renderUpcoming() {
     return `<div class="rel${u.inSeries || u.rel ? ' mine' : ''}">
       <span class="rel-date${sameDay ? ' same' : ''}" aria-label="${esc(`${wd} ${day} ${month}`)}">${sameDay ? '' : `<b>${day}</b><span>${esc(month)}</span><span>${esc(wd)}</span>`}</span>
       ${coverHTML(u.item)}
-      <span class="row-main"><b>${esc(u.item.title)}</b><span>${esc([u.item.price != null ? euro(u.item.price) : '', u.line].filter(Boolean).join(', '))}</span></span>
+      <span class="row-main"><b>${esc(u.item.title)}</b><span>${esc([u.item.price != null ? euro(u.item.price) : '', u.item.publisher === 'Panini' ? u.line : u.item.publisher].filter(Boolean).join(', '))}</span></span>
       ${why}
     </div>`;
   };
@@ -66,13 +67,15 @@ export function renderUpcoming() {
 }
 
 export function setupUpcoming() {
-  $('#new-filters').addEventListener('click', (e) => {
-    const b = e.target.closest('.chip');
-    if (!b) return;
-    line = b.dataset.line;
-    $$('#new-filters .chip').forEach((x) => { x.classList.toggle('on', x === b); x.setAttribute('aria-pressed', String(x === b)); });
-    renderUpcoming();
-  });
+  for (const id of ['#new-filters', '#new-pubs']) {
+    $(id).addEventListener('click', (e) => {
+      const b = e.target.closest('.chip');
+      if (!b) return;
+      if (id === '#new-pubs') pub = b.dataset.pub; else line = b.dataset.line;
+      $$(`${id} .chip`).forEach((x) => { x.classList.toggle('on', x === b); x.setAttribute('aria-pressed', String(x === b)); });
+      renderUpcoming();
+    });
+  }
   $('#new-list').addEventListener('click', async (e) => {
     const b = e.target.closest('.row-add');
     if (!b) return;

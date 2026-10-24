@@ -448,12 +448,21 @@ for p in issn_extras:   # grapas con código y sin número en el título (especi
         o['type'] = 'manga'
     out_extras.append(o)
 
+# Otras editoriales (sus ISBN repetidos con Panini se quedan en Panini)
+import build_planeta
+used = {i['isbn'] for s in out_series for i in s['issues'].values() if 'isbn' in i} | {e['isbn'] for e in out_extras if 'isbn' in e}
+names = {key(s['name']) for s in out_series}
+pl_series, pl_extras = build_planeta.build(key, used, names)
+out_series = sorted(out_series + pl_series, key=lambda s: key(s['name']))
+out_extras += pl_extras
+
 out = {
     'version': 2,
     'updated': __import__('datetime').date.today().isoformat(),
-    'source': 'Catálogo de Panini España (panini.es): Marvel y DC',
+    'source': 'Catálogos de Panini España (panini.es) y Planeta Cómic (planetadelibros.com)',
     'img': 'https://www.panini.es/media/catalog/product/',
     'imgq': '?quality=80&fit=bounds&height=480&width=320',
+    'imgs': {'pl': build_planeta.IMG},   # portadas de otras editoriales: "pl:ruta"
     'series': out_series,
     'extras': out_extras,
 }
