@@ -1,0 +1,171 @@
+#!/usr/bin/env python3
+"""Busca novedades de Marvel y DC en panini.es y las añade a tools/panini_raw.json.
+
+Uso: python3 tools/update_panini.py [--max N]
+Después se regenera el catálogo con tools/build_panini.py (la tarea semanal lo hace sola).
+
+Qué hace, respetando robots.txt (solo el mapa del sitio y las fichas de producto, una petición por segundo):
+1. Lee el mapa del sitio de cómics y saca las referencias nuevas.
+2. Abre la ficha de las nuevas que pueden ser de Marvel o DC (por la referencia o, si es una colección
+   nueva, por la editorial original que pone la ficha) y las añade.
+3. Vuelve a abrir las fichas de lo que sale pronto o acaba de salir, para actualizar fecha, precio,
+   disponibilidad y códigos (Panini los rellena según se acerca la salida).
+"""
+import html, json, os, re, sys, time, urllib.request
+from datetime import date, timedelta
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+RAW = os.path.join(HERE, 'panini_raw.json')
+SKIP = os.path.join(HERE, 'panini_skip.json')   # colecciones y referencias que no son de Marvel ni DC
+BASE = 'https://www.panini.es'
+SITEMAP = BASE + '/media/shp_esp_es/comics-sitemap.xml'
+UA = 'ShioriCatalogo/1.0 (+https://github.com/yokki21/Shiori)'
+DELAY = 1.0
+MONTHS = {'ene': 1, 'feb': 2, 'mar': 3, 'abr': 4, 'may': 5, 'jun': 6, 'jul': 7, 'ago': 8, 'sep': 9, 'sept': 9, 'oct': 10, 'nov': 11, 'dic': 12}
+
+
+def get(url, tries=3):
+    for i in range(tries):
+        try:
+            req = urllib.request.Request(url, headers={'User-Agent': UA, 'Accept-Language': 'es-ES,es;q=0.9'})
+            with urllib.request.urlopen(req, timeout=30) as r:
+                return r.read().decode('utf-8', 'replace')
+        except urllib.error.HTTPError as e:
+            if e.code == 404:
+                return None
+            if i == tries - 1:
+                raise
+        except Exception:
+            if i == tries - 1:
+                raise
+        time.sleep(5 * (i + 1))
+
+
+def field(h, cls):
+    m = re.search(rf'class="item {cls}"[\s\S]*?<span class="data">([\s\S]*?)</span>', h)
+    return re.sub(r'\s+', ' ', re.sub(r'<[^>]+>', '', m.group(1))).strip() if m else ''
+
+
+def parse_page(h):
+    """Lo mismo que se sacó de cada ficha en el recorrido inicial (ver build_panini.py)."""
+    title = html.unescape((re.search(r'itemprop="name">([^<]+)<', h) or [None, ''])[1]).strip()
+    ld = re.search(r'"@type":"Product","name":"((?:[^"\\]|\\.)*)","image":"([^"]+)"', h)
+    if not title and ld:
+        title = json.loads(f'"{ld.group(1)}"')
+    img = ''
+    if ld and '/media/catalog/product/' in ld.group(2):
+        img = ld.group(2).replace('\\/', '/').split('/media/catalog/product/')[1].split('?')[0]
+    price = re.search(r'data-price-amount="([\d.]+)"\s+data-price-type="oldPrice"', h) or re.search(r'data-price-amount="([\d.]+)"\s+data-price-type="finalPrice"', h)
+    code = re.search(r'97[789]\d{10}', field(h, 'pnn_isbn'))
+    return {
+        'title': title, 'img': img,
+        'editor': field(h, 'pnn_original_editor'),
+        'date': field(h, 'pnn_release_date'),
+        'pages': int(field(h, 'pnn_pages_number')) if field(h, 'pnn_pages_number').isdigit() else None,
+        'authors': field(h, 'pnn_authors_display')[:160],
+        'price': float(price.group(1)) if price else None,
+        'code': code.group(0) if code else None,
+        'issn': re.sub(r'\D', '', field(h, 'pnn_issn')) or None,
+        'listed': 'class="stock unavailable"' not in h,
+    }
+
+
+def iso(pdate):
+    m = re.match(r'^(\d{1,2}) ([a-z]+)\.? (\d{4})$', (pdate or '').strip().lower())
+    return f'{m.group(3)}-{MONTHS[m.group(2)]:02d}-{int(m.group(1)):02d}' if m and m.group(2) in MONTHS else ''
+
+
+def category(editor):
+    e = (editor or '').lower()
+    if 'marvel' in e:
+        return 'marvel'
+    if re.search(r'\bdc\b', e):
+        return 'dc'
+    return None
+
+
+def main():
+    limit = int(sys.argv[sys.argv.index('--max') + 1]) if '--max' in sys.argv else 400
+    raw = json.load(open(RAW))
+    K = raw['keys']
+    for k in ('ptitle', 'pdate', 'pages', 'authors', 'pprice', 'pcode', 'pissn'):
+        if k not in K:
+            K.append(k)
+            for r in raw['rows']:
+                r.append(None)
+    col = {k: i for i, k in enumerate(K)}
+    rows = {r[col['sku']]: r for r in raw['rows']}
+    sk = json.load(open(SKIP)) if os.path.exists(SKIP) else None
+
+    xml = get(SITEMAP)
+    entries = {}
+    for m in re.finditer(r'/shp_esp_es/([^<"]+?-([a-z0-9]+)-es01)\.html', xml):
+        entries[m.group(2)] = m.group(1)
+    pre = lambda s: (re.match(r'[a-z]+', s) or [s])[0]
+    ours = {pre(s) for s in rows}
+    if sk is None:   # primera vez: las colecciones que hoy no son de Marvel ni DC (manga, otras líneas) no se miran
+        sk = {'prefixes': sorted({pre(s) for s in entries} - ours), 'skus': []}
+    other_pre, skip = set(sk['prefixes']), set(sk['skus'])
+    print(f'mapa del sitio: {len(entries)} productos, {len(rows)} ya en el catálogo', file=sys.stderr)
+
+    # Referencias nuevas: primero las de colecciones conocidas; las de colecciones nuevas se comprueban
+    new = [s for s in entries if s not in rows and s not in skip]
+    known_new = [s for s in new if pre(s) in ours]
+    unknown_new = [s for s in new if pre(s) not in ours and pre(s) not in other_pre]
+    # Lo que sale pronto o acaba de salir: se refresca para tener fecha, precio y códigos al día
+    today = date.today()
+    soon = []
+    for s, r in rows.items():
+        d = iso(r[col['pdate']]) or ''
+        if d and today - timedelta(days=21) <= date.fromisoformat(d) <= today + timedelta(days=120):
+            soon.append(s)
+    todo = known_new + unknown_new + soon
+    print(f'nuevas: {len(known_new)} de colecciones conocidas, {len(unknown_new)} por comprobar; a refrescar: {len(soon)}', file=sys.stderr)
+
+    added = updated = skipped = 0
+    for s in todo[:limit]:
+        slug = entries.get(s) or (rows[s][col['slug']] if s in rows else None)
+        if not slug:
+            continue
+        time.sleep(DELAY)
+        h = get(f'{BASE}/shp_esp_es/{slug}.html')
+        if not h:
+            continue
+        p = parse_page(h)
+        if s in rows:   # refresco
+            r = rows[s]
+            for k, v in (('ptitle', p['title']), ('pdate', p['date']), ('pages', p['pages']), ('authors', p['authors']),
+                         ('pprice', p['price']), ('pcode', p['code']), ('pissn', p['issn'])):
+                if v:
+                    r[col[k]] = v
+            r[col['listed']] = p['listed']
+            if p['img'] and not r[col['img']]:
+                r[col['img']] = p['img']
+            updated += 1
+            continue
+        cat = category(p['editor'])
+        if not cat:
+            skip.add(s)
+            skipped += 1
+            continue
+        r = [None] * len(K)
+        for k, v in (('sku', s), ('slug', slug), ('title', p['title']), ('price', p['price']), ('date', ''), ('cat', cat),
+                     ('img', p['img']), ('code', None), ('addon', None), ('listed', p['listed']), ('ptitle', p['title']),
+                     ('pdate', p['date']), ('pages', p['pages']), ('authors', p['authors']), ('pprice', p['price']),
+                     ('pcode', p['code']), ('pissn', p['issn'])):
+            r[col[k]] = v
+        raw['rows'].append(r)
+        rows[s] = r
+        added += 1
+        print(f'  + {s}: {p["title"]} ({p["date"]})', file=sys.stderr)
+
+    raw['rows'].sort(key=lambda r: r[col['sku']])
+    json.dump(raw, open(RAW, 'w'), ensure_ascii=False)
+    json.dump({'prefixes': sorted(other_pre), 'skus': sorted(skip)}, open(SKIP, 'w'), indent=0)
+    print(f'añadidas {added}, actualizadas {updated}, descartadas (otras editoriales) {skipped}', file=sys.stderr)
+    # Para la tarea de GitHub: resumen en una línea
+    print(json.dumps({'added': added, 'updated': updated, 'skipped': skipped}))
+
+
+if __name__ == '__main__':
+    main()

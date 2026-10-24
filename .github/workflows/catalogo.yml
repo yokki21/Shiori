@@ -1,0 +1,46 @@
+# Cada lunes busca novedades de Marvel y DC en panini.es, regenera el catálogo y lo publica.
+name: Catálogo semanal
+on:
+  schedule:
+    - cron: '17 5 * * 1'   # lunes a las 05:17 UTC (07:17 en Madrid en verano)
+  workflow_dispatch:
+    inputs:
+      max:
+        description: Fichas como máximo en esta pasada
+        default: '400'
+permissions:
+  contents: write
+  pages: write
+concurrency:
+  group: catalogo
+  cancel-in-progress: false
+jobs:
+  actualizar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Buscar novedades en Panini
+        run: python3 tools/update_panini.py --max "${{ github.event.inputs.max || '400' }}"
+      - name: Regenerar el catálogo
+        run: python3 tools/build_panini.py
+      - name: Comprobar el catálogo
+        run: node --test tests/unit.test.mjs
+      - name: Publicar si hay cambios
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name "yokki21"
+          git config user.email "jmartinezserrano31@gmail.com"
+          git add catalog/catalog.json tools/panini_raw.json tools/panini_skip.json
+          if git diff --cached --quiet; then echo "Sin cambios"; exit 0; fi
+          git commit -m "Catálogo: novedades de Panini ($(date +%F))"
+          git push
+          # Los envíos hechos desde una tarea no lanzan la publicación de Pages: se pide a mano
+          gh api -X POST "repos/${{ github.repository }}/pages/builds" || echo "No se ha podido pedir la publicación"
