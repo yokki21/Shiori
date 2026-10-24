@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""Busca novedades de Marvel y DC en panini.es y las añade a tools/panini_raw.json.
+"""Busca novedades de cómics y manga en panini.es (Marvel, DC, manga y el resto) y las añade a tools/panini_raw.json.
 
 Uso: python3 tools/update_panini.py [--max N]
 Después se regenera el catálogo con tools/build_panini.py (la tarea semanal lo hace sola).
 
 Qué hace, respetando robots.txt (solo el mapa del sitio y las fichas de producto, una petición por segundo):
 1. Lee el mapa del sitio de cómics y saca las referencias nuevas.
-2. Abre la ficha de las nuevas que pueden ser de Marvel o DC (por la referencia o, si es una colección
-   nueva, por la editorial original que pone la ficha) y las añade.
+2. Abre la ficha de las nuevas y las clasifica: Marvel o DC por la editorial original de la ficha,
+   manga por su colección (tools/panini_manga_prefixes.json) o su encuadernación (tankobon), y el resto.
 3. Vuelve a abrir las fichas de lo que sale pronto o acaba de salir, para actualizar fecha, precio,
    disponibilidad y códigos (Panini los rellena según se acerca la salida).
 """
@@ -16,7 +16,8 @@ from datetime import date, timedelta
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 RAW = os.path.join(HERE, 'panini_raw.json')
-SKIP = os.path.join(HERE, 'panini_skip.json')   # colecciones y referencias que no son de Marvel ni DC
+SKIP = os.path.join(HERE, 'panini_skip.json')   # referencias que no se pueden añadir (packs, fichas vacías)
+MANGA = os.path.join(HERE, 'panini_manga_prefixes.json')   # colecciones del listado de manga de Panini
 BASE = 'https://www.panini.es'
 SITEMAP = BASE + '/media/shp_esp_es/comics-sitemap.xml'
 UA = 'ShioriCatalogo/1.0 (+https://github.com/yokki21/Shiori)'
@@ -70,6 +71,7 @@ def parse_page(h):
         'code': code.group(0) if code else None,
         'issn': re.sub(r'\D', '', field(h, 'pnn_issn')) or None,
         'listed': 'class="stock unavailable"' not in h,
+        'binding': field(h, 'pnn_binding'),
     }
 
 
@@ -78,13 +80,15 @@ def iso(pdate):
     return f'{m.group(3)}-{MONTHS[m.group(2)]:02d}-{int(m.group(1)):02d}' if m and m.group(2) in MONTHS else ''
 
 
-def category(editor):
-    e = (editor or '').lower()
+def category(p, prefix, manga_prefixes):
+    e = (p['editor'] or '').lower()
     if 'marvel' in e:
         return 'marvel'
     if re.search(r'\bdc\b', e):
         return 'dc'
-    return None
+    if prefix in manga_prefixes or 'tankobon' in (p.get('binding') or '').lower():
+        return 'manga'
+    return 'otros'
 
 
 def main():
@@ -106,15 +110,15 @@ def main():
         entries[m.group(2)] = m.group(1)
     pre = lambda s: (re.match(r'[a-z]+', s) or [s])[0]
     ours = {pre(s) for s in rows}
-    if sk is None:   # primera vez: las colecciones que hoy no son de Marvel ni DC (manga, otras líneas) no se miran
-        sk = {'prefixes': sorted({pre(s) for s in entries} - ours), 'skus': []}
-    other_pre, skip = set(sk['prefixes']), set(sk['skus'])
+    skip = set((sk or {}).get('skus', []))
+    manga_prefixes = set(json.load(open(MANGA))) if os.path.exists(MANGA) else set()
     print(f'mapa del sitio: {len(entries)} productos, {len(rows)} ya en el catálogo', file=sys.stderr)
 
     # Referencias nuevas: primero las de colecciones conocidas; las de colecciones nuevas se comprueban
     new = [s for s in entries if s not in rows and s not in skip]
+    new = [s for s in new if not s.startswith('bundle')]   # packs de varios tomos
     known_new = [s for s in new if pre(s) in ours]
-    unknown_new = [s for s in new if pre(s) not in ours and pre(s) not in other_pre]
+    unknown_new = [s for s in new if pre(s) not in ours]
     # Lo que sale pronto o acaba de salir: se refresca para tener fecha, precio y códigos al día
     today = date.today()
     soon = []
@@ -146,8 +150,8 @@ def main():
                 r[col['img']] = p['img']
             updated += 1
             continue
-        cat = category(p['editor'])
-        if not cat:
+        cat = category(p, pre(s), manga_prefixes)
+        if not p['title']:
             skip.add(s)
             skipped += 1
             continue
@@ -164,8 +168,8 @@ def main():
 
     raw['rows'].sort(key=lambda r: r[col['sku']])
     json.dump(raw, open(RAW, 'w'), ensure_ascii=False)
-    json.dump({'prefixes': sorted(other_pre), 'skus': sorted(skip)}, open(SKIP, 'w'), indent=0)
-    print(f'añadidas {added}, actualizadas {updated}, descartadas (otras editoriales) {skipped}', file=sys.stderr)
+    json.dump({'skus': sorted(skip)}, open(SKIP, 'w'), indent=0)
+    print(f'añadidas {added}, actualizadas {updated}, descartadas {skipped}', file=sys.stderr)
     # Para la tarea de GitHub: resumen en una línea
     print(json.dumps({'added': added, 'updated': updated, 'skipped': skipped}))
 

@@ -1,7 +1,7 @@
 // Service worker: la app abre sin conexión y con mala cobertura.
 // Archivos propios: red primero con límite de 2,5 s; si tarda o falla, la copia guardada.
 // No se guardan imágenes de otras webs: el navegador las cuenta como ~7 MB cada una.
-const VERSION = 'shiori-v19';
+const VERSION = 'shiori-v20';
 const SHELL = [
   './', 'index.html', 'css/styles.css', 'manifest.webmanifest', 'catalog/catalog.json',
   'js/app.js', 'js/util.js', 'js/store.js', 'js/db.js', 'js/sync.js', 'js/config.js',

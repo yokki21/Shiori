@@ -311,6 +311,8 @@ for (prefix, k), items in loose.items():
             put_issue(s, n, p)
 
 # ---------- Salida ----------
+LINE = {'marvel': 'Marvel', 'dc': 'DC', 'manga': 'Manga', 'otros': 'Otros'}   # línea de Panini (filtro de Novedades)
+TYPE = {'manga': 'manga'}
 def issue_out(sname, n, p, isbn):
     o = {}
     if p['title'] != f'{sname} {n}':
@@ -342,7 +344,8 @@ for s in series.values():
         (n, it), = s['issues'].items()
         extras.append((it['_p'], it['isbn']))
         continue
-    o = {'name': s['name'], 'publisher': 'Panini', 'type': 'americano', 'line': 'DC' if s['cats'].most_common(1)[0][0] == 'dc' else 'Marvel'}
+    cat = s['cats'].most_common(1)[0][0]
+    o = {'name': s['name'], 'publisher': 'Panini', 'type': TYPE.get(cat, 'americano'), 'line': LINE.get(cat, 'Otros')}
     if s['issn']:
         o['issn'], o['ean'] = s['issn'], s['ean']
     if s.get('unnumbered'):
@@ -407,7 +410,9 @@ for p, isbn in sorted(extras, key=lambda e: key(e[0]['title'])):
     if id(p) in extra_ref:
         o['series'], o['number'] = extra_ref[id(p)]
     o.update({k: v for k, v in issue_out('', -1, p, isbn).items() if k != 'title'})
-    o['line'] = 'DC' if p['cat'] == 'dc' else 'Marvel'
+    o['line'] = LINE.get(p['cat'], 'Otros')
+    if TYPE.get(p['cat']) == 'manga':
+        o['type'] = 'manga'
     out_extras.append(o)
 for p in issn_extras:   # grapas con código y sin número en el título (especiales de una colección)
     o = {'title': nice(p['title']), 'issn': issn_from_ean(p['code'])}
@@ -415,7 +420,9 @@ for p in issn_extras:   # grapas con código y sin número en el título (especi
     if an is not None:
         o['a'] = an
     o.update({k: v for k, v in issue_out('', -1, p, None).items() if k != 'title'})
-    o['line'] = 'DC' if p['cat'] == 'dc' else 'Marvel'
+    o['line'] = LINE.get(p['cat'], 'Otros')
+    if TYPE.get(p['cat']) == 'manga':
+        o['type'] = 'manga'
     out_extras.append(o)
 
 out = {
