@@ -9,10 +9,12 @@ import { openScanner, openAdd, handleCode } from './scan.js';
 import { renderLibrary, setupLibrary } from './views/library.js';
 import { renderSeries, renderSeriesSheet, setupSeries, openSeries } from './views/series.js';
 import { renderProfile, renderSettings, renderAccount, setupProfile } from './views/profile.js';
+import { renderWish, setupWish, refreshWishResults } from './views/wish.js';
 
 const VIEWS = {
   library: { title: 'Biblioteca', tag: '本棚', render: renderLibrary },
   series: { title: 'Series', tag: '全巻', render: renderSeries },
+  wish: { title: 'Deseados', tag: '欲しい', render: renderWish },
   profile: { title: 'Perfil', tag: '記録', render: () => { renderProfile(); renderSettings(); } },
 };
 let current = 'library';
@@ -40,6 +42,7 @@ function render() {
     pending = false;
     VIEWS[current].render();
     refreshDetail();
+    refreshWishResults();
     if ($('#sheet-series').open) renderSeriesSheet();
   });
 }
@@ -67,16 +70,19 @@ async function init() {
   setupLibrary();
   setupSeries();
   setupProfile();
+  setupWish();
   onChange(render);
 
   $$('.tab[data-view]').forEach((t) => t.addEventListener('click', () => showView(t.dataset.view)));
   $('#btn-scan').addEventListener('click', openScanner);
   $('#btn-add').addEventListener('click', () => openAdd({ focus: true }));
+  $('#brand').addEventListener('click', () => showView('library'));   // el logo lleva a la página principal
   document.addEventListener('click', (e) => { if (e.target.closest('[data-action="scan"]')) openScanner(); });
 
   loadCatalog().then(fillFromCatalog).then(render);
   startCloud({
     onUser: () => { renderAccount(); render(); },
+    onProfile: () => { renderAccount(); render(); },
     onStatus: () => { renderAccount(); if (current === 'profile') render(); },
     onSynced: ({ down }) => { if (down) toast(`Tu cuenta tenía ${plural(down, 'cambio', 'cambios')} y ya están en este dispositivo`); },
   });

@@ -33,14 +33,21 @@
       <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M15 15l5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
       <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
       <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+      <symbol id="i-ribbon" viewBox="0 0 24 24"><path d="M7 3.5h10v17l-5-4-5 4z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
       <symbol id="i-camera" viewBox="0 0 24 24"><path d="M4 8h3l1.5-2h7L17 8h3v11H4z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="12" cy="13.5" r="3.3" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
     </defs>
   </svg>
 
   <div class="app">
     <header class="topbar">
-      <h1 id="screen-title">Biblioteca</h1>
-      <span class="tanafuda" id="screen-tag" lang="ja" aria-hidden="true">本棚</span>
+      <div class="title-block">
+        <button class="brand" id="brand" aria-label="Shiori: ir a la biblioteca"><span class="brand-mark" lang="ja" aria-hidden="true">栞</span>Shiori</button>
+        <h1 id="screen-title">Biblioteca</h1>
+      </div>
+      <div class="top-actions">
+        <button class="add-btn" id="btn-add" aria-label="Añadir un cómic"><svg aria-hidden="true"><use href="#i-plus"/></svg></button>
+        <span class="tanafuda" id="screen-tag" lang="ja" aria-hidden="true">本棚</span>
+      </div>
     </header>
 
     <main>
@@ -60,6 +67,7 @@
               <option value="recent">Recientes</option>
               <option value="series">Por serie</option>
               <option value="title">Por título</option>
+              <option value="rating">Mejor valorados</option>
             </select>
           </div>
         </div>
@@ -70,6 +78,16 @@
       <section class="view" id="view-series" hidden>
         <p class="count" id="series-count"></p>
         <div id="series-list"></div>
+      </section>
+
+      <section class="view" id="view-wish" hidden>
+        <form class="search wish-search" id="wish-form" role="search">
+          <svg aria-hidden="true"><use href="#i-search"/></svg>
+          <input type="search" id="wish-input" placeholder="Busca una serie, grapa o tomo" autocomplete="off" enterkeyhint="search" aria-label="Buscar en el catálogo para añadir a deseados">
+        </form>
+        <div id="wish-results"></div>
+        <p class="count" id="wish-count"></p>
+        <div class="shelf" id="wish-grid"></div>
       </section>
 
       <section class="view" id="view-profile" hidden>
@@ -115,7 +133,7 @@
       <button class="tab on" data-view="library" aria-current="page"><svg aria-hidden="true"><use href="#i-shelf"/></svg><span>Biblioteca</span></button>
       <button class="tab" data-view="series"><svg aria-hidden="true"><use href="#i-series"/></svg><span>Series</span></button>
       <button class="hanko" id="btn-scan" aria-label="Escanear código de barras"><span class="seal" lang="ja" aria-hidden="true">読</span><span class="lbl">Escanear</span></button>
-      <button class="tab" id="btn-add"><svg aria-hidden="true"><use href="#i-plus"/></svg><span>Añadir</span></button>
+      <button class="tab" data-view="wish"><svg aria-hidden="true"><use href="#i-ribbon"/></svg><span>Deseados</span></button>
       <button class="tab" data-view="profile"><svg aria-hidden="true"><use href="#i-user"/></svg><span>Perfil</span></button>
     </nav>
   </div>
@@ -175,6 +193,7 @@
           <label class="field grow"><span>Precio (€)</span><input name="price" inputmode="decimal" placeholder="9,50" autocomplete="off"></label>
           <label class="field grow"><span>Fecha de compra</span><input name="purchaseDate" type="date"></label>
         </div>
+        <label class="field" id="read-field"><span>Fecha de lectura (si la pones, queda como leído)</span><input name="readAt" type="date"></label>
         <label class="field"><span>Editorial</span><input name="publisher" list="publisher-options" autocomplete="off"></label>
         <datalist id="publisher-options"></datalist>
         <label class="field"><span>Autores</span><input name="authors" autocomplete="off"></label>
@@ -249,7 +268,21 @@
         <p class="small acc-msg" id="acc-msg" aria-live="polite"></p>
       </form>
       <div id="account-in" hidden>
-        <p>Conectado como <b id="acc-who"></b></p>
+        <div class="me-photo">
+          <div class="avatar big" id="acc-avatar" aria-hidden="true"></div>
+          <div class="btn-row">
+            <label class="btn small">Cambiar foto<input type="file" id="acc-photo" accept="image/*" hidden></label>
+            <button class="btn small" id="acc-photo-remove" hidden>Quitar foto</button>
+          </div>
+        </div>
+        <form id="acc-name-form" class="name-form" novalidate>
+          <label class="field"><span>Nombre de usuario</span>
+            <span class="at-input"><b aria-hidden="true">@</b><input id="acc-username" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="20" placeholder="tu_nombre"></span>
+          </label>
+          <button class="btn primary small" type="submit" id="acc-name-save">Guardar</button>
+        </form>
+        <p class="small muted" id="acc-name-msg" aria-live="polite">De 3 a 20 caracteres: letras minúsculas, números, punto y guion bajo. Es único: nadie más puede tener el mismo.</p>
+        <p class="small">Conectado como <b id="acc-who"></b></p>
         <p class="muted small" id="sync-status" aria-live="polite"></p>
         <div class="btn-row"><button class="btn small" id="acc-out">Cerrar sesión</button></div>
       </div>
@@ -262,7 +295,8 @@
       <h2 id="confirm-title"></h2>
       <p id="confirm-text" class="muted"></p>
       <button class="btn wide primary" id="confirm-ok"></button>
-      <button class="btn wide" data-close>Cancelar</button>
+      <button class="btn wide" id="confirm-alt" hidden></button>
+      <button class="btn wide quiet" data-close>Cancelar</button>
     </div>
   </dialog>
 

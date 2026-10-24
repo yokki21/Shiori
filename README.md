@@ -10,7 +10,9 @@ App web instalable (PWA) en **https://yokki21.github.io/Shiori/**. Funciona sin 
 - **Añadir sin cámara:** un buscador que entiende título, ISBN o ISSN, o leer el código desde una foto.
 - **Biblioteca:** tus portadas, con buscador y filtro de leídos. Al tocar un cómic ves toda su información y el botón **Marcar como leído**.
 - **Series:** cada serie que tienes, qué números, cuántos te faltan y cuánto costaría completarla. Desde ahí puedes añadir los que te falten.
-- **Perfil:** cómics, dinero invertido, porcentaje leído, series completas, lo que costaría completar todas, gasto por mes y por editorial. Y los ajustes: añadir automáticamente, copia de seguridad, cuenta.
+- **Deseados:** buscas en el catálogo una serie, grapa o tomo y lo apuntas (o la serie entera). Al escanearlo, pasa solo a la biblioteca.
+- **Notas:** tu nota de 1 a 5 y tu reseña; la nota de Google Books u Open Library si la hay, y enlaces a Goodreads, League of Comic Geeks y Comic Book Roundup.
+- **Perfil:** nombre de usuario único y foto (con cuenta); cómics, dinero invertido, porcentaje leído, series completas, lo que costaría completar todas, gasto por mes y por editorial. Y los ajustes: añadir automáticamente, copia de seguridad, cuenta.
 
 ## De dónde salen los datos
 
@@ -65,14 +67,24 @@ Con una cuenta, la biblioteca se guarda también en la nube y se sincroniza entr
    rules_version = '2';
    service cloud.firestore {
      match /databases/{database}/documents {
+       // Tus cómics, series y perfil (nombre de usuario y foto): solo tú
        match /users/{uid}/{document=**} {
          allow read, write: if request.auth != null && request.auth.uid == uid;
+       }
+       // Nombres de usuario: cualquiera puede comprobar si uno está libre;
+       // solo se reserva uno libre para tu cuenta y solo puedes liberar el tuyo
+       match /usernames/{name} {
+         allow read: if true;
+         allow create: if request.auth != null
+                       && request.resource.data.uid == request.auth.uid
+                       && name.matches('^[a-z0-9_.]{3,20}$');
+         allow delete: if request.auth != null && resource.data.uid == request.auth.uid;
        }
      }
    }
    ```
 
-   Así cada usuario solo puede leer y escribir sus propios cómics.
+   Así cada usuario solo puede leer y escribir sus propios cómics, y los nombres de usuario no se repiten.
 5. *Configuración del proyecto (rueda) → Tus apps → Web (`</>`)*, registra la app «Shiori» y copia el objeto `firebaseConfig` en `FIREBASE_CONFIG` de `js/config.js`. Esa configuración no es secreta.
 
 El plan gratuito (Spark) sobra para uso personal: 50.000 lecturas y 20.000 escrituras al día.

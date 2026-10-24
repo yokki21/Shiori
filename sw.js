@@ -1,12 +1,12 @@
 // Service worker: la app abre sin conexión y con mala cobertura.
 // Archivos propios: red primero con límite de 2,5 s; si tarda o falla, la copia guardada.
 // No se guardan imágenes de otras webs: el navegador las cuenta como ~7 MB cada una.
-const VERSION = 'shiori-v17';
+const VERSION = 'shiori-v18';
 const SHELL = [
   './', 'index.html', 'css/styles.css', 'manifest.webmanifest', 'catalog/catalog.json',
   'js/app.js', 'js/util.js', 'js/store.js', 'js/db.js', 'js/sync.js', 'js/config.js',
   'js/catalog.js', 'js/series.js', 'js/comic.js', 'js/scan.js', 'js/scanner.js', 'js/ean.js', 'js/lookup.js',
-  'js/decoder-worker.js', 'js/views/library.js', 'js/views/series.js', 'js/views/profile.js',
+  'js/decoder-worker.js', 'js/views/library.js', 'js/views/series.js', 'js/views/profile.js', 'js/views/wish.js',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/favicon.svg', 'icons/apple-touch-icon.png',
 ];
 const FONTS = 'shiori-fonts';

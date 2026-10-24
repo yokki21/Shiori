@@ -80,6 +80,21 @@ h1, h2, h3 { text-wrap: balance; }
   backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
 }
 .topbar h1 { margin: 0; font: 700 31px/1.1 var(--mincho); letter-spacing: .01em; }
+.title-block { min-width: 0; }
+.brand { /* el logo: lleva a la biblioteca */
+  display: inline-flex; align-items: center; gap: 6px; margin: 0 0 6px -2px; padding: 2px; border: 0; background: none;
+  color: var(--sumi-2); font: 700 13px/1 var(--mincho); letter-spacing: .06em;
+}
+.brand-mark {
+  display: grid; place-items: center; width: 22px; height: 22px; border-radius: 3px;
+  background: var(--sumi); color: var(--washi); font: 800 13px/1 var(--mincho);
+}
+.top-actions { display: flex; align-items: flex-start; gap: 12px; flex: none; }
+.add-btn {
+  display: grid; place-items: center; width: 40px; height: 40px; margin-top: 8px; border-radius: 50%;
+  border: 1.5px solid var(--sumi); background: transparent; color: var(--sumi);
+}
+.add-btn:active { background: var(--rule); }
 .tanafuda { /* 棚札: la etiqueta vertical de las baldas */
   flex: none; writing-mode: vertical-rl; text-orientation: upright;
   padding: 7px 4px; margin-top: 2px; border: 1.5px solid var(--shu); border-radius: 2px;
@@ -186,6 +201,7 @@ select {
 .btn.primary { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
 .btn.danger { color: var(--shu); border-color: var(--shu); }
 .btn.danger-solid { background: var(--shu); border-color: var(--shu); color: var(--on-shu); }
+.btn.quiet { border-color: transparent; color: var(--sumi-2); }
 .btn.small { min-height: 38px; padding: 0 14px; font-size: 14px; border-width: 1px; }
 .btn.wide { width: 100%; margin-top: 10px; }
 .btn:disabled { opacity: .45; }
@@ -502,3 +518,51 @@ dialog.confirm p { margin: 0 0 10px; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition: none !important; }
 }
+
+/* ---------- Deseados ---------- */
+.wish-search { margin-bottom: 6px; }
+#wish-results:not(:empty) { margin-bottom: 26px; }
+.tag-price {
+  position: absolute; left: 0; bottom: 8px; z-index: 3; padding: 2px 7px 2px 6px;
+  background: var(--kami); color: var(--sumi); font: 700 11.5px/1.3 var(--mincho); box-shadow: var(--lift);
+}
+.row-state { font-size: 13px; font-weight: 700; color: var(--sumi-3); }
+.row-state.wished { color: var(--shu); }
+.series-row .row-main b::before { content: '全'; display: inline-grid; place-items: center; width: 18px; height: 18px; margin-right: 6px; border: 1px solid var(--shu); border-radius: 2px; color: var(--shu); font: 800 11px/1 var(--mincho); vertical-align: 2px; }
+.vol-wish { position: absolute; left: 4px; bottom: 26px; z-index: 3; padding: 1px 6px; background: var(--shu); color: var(--on-shu); font-size: 10.5px; font-weight: 700; }
+
+/* ---------- Notas y reseñas ---------- */
+.rating-block { margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--rule); }
+.rating-block h4 { margin: 0 0 8px; font: 700 16px/1.3 var(--mincho); }
+.stars { display: flex; gap: 2px; }
+.star { width: 40px; height: 40px; padding: 0; border: 0; background: none; color: var(--rule); font-size: 28px; line-height: 1; }
+.star.on { color: var(--shu); }
+.review { margin: 10px 0 0; padding: 12px 14px; border-left: 2px solid var(--shu); background: var(--kami); white-space: pre-wrap; font-size: 15px; }
+.review-edit { margin-top: 10px; }
+.review-edit summary { cursor: pointer; font-weight: 700; color: var(--link); min-height: 30px; }
+.review-edit textarea { width: 100%; margin: 8px 0; padding: 10px 12px; border: 1.5px solid var(--rule); border-radius: 4px; background: var(--kami); resize: vertical; }
+.ext-score { display: flex; align-items: baseline; gap: 6px; padding: 6px 0; color: var(--sumi); text-decoration: none; }
+.ext-score b { font: 700 24px/1 var(--mincho); color: var(--shu); }
+.ext-score span { font-size: 14px; color: var(--sumi-2); }
+.ext-links { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.ext { display: inline-flex; align-items: center; min-height: 36px; padding: 0 12px; border: 1px solid var(--sumi); border-radius: 3px; color: var(--sumi); font-size: 13.5px; font-weight: 700; text-decoration: none; }
+.ext::after { content: '↗'; margin-left: 6px; color: var(--sumi-3); }
+.date-edit { padding: 0; border: 0; background: none; color: var(--link); font: inherit; text-decoration: underline dotted; text-underline-offset: 3px; }
+.date-picker { position: fixed; left: 50%; bottom: 0; width: 1px; height: 1px; opacity: 0; pointer-events: none; border: 0; padding: 0; }
+
+/* ---------- Cuenta: foto y nombre de usuario ---------- */
+.avatar.photo { padding: 0; overflow: hidden; border-color: var(--sumi); }
+.avatar.photo img { width: 100%; height: 100%; object-fit: cover; display: block; transform: rotate(4deg) scale(1.08); }
+.avatar.big { width: 76px; height: 76px; font-size: 32px; }
+.me-photo { display: flex; align-items: center; gap: 16px; margin-bottom: 14px; }
+.me-photo .btn-row { margin-top: 0; }
+.name-form { display: flex; align-items: flex-end; gap: 10px; }
+.name-form .field { flex: 1; margin-bottom: 0; }
+.at-input { display: flex; align-items: center; border-bottom: 1.5px solid var(--rule); }
+.at-input:focus-within { border-color: var(--sumi); }
+.at-input b { color: var(--sumi-3); font-weight: 700; padding-right: 2px; }
+.field .at-input input { border: 0; padding-left: 0; }
+#acc-name-msg { margin: 8px 0 16px; }
+.ok-text { color: var(--ok); }
+.warn-text { color: var(--shu); }
+.search input::-webkit-search-cancel-button { filter: grayscale(1); opacity: .6; }

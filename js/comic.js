@@ -1,8 +1,8 @@
 // Ficha de un cómic: vista con toda su información y el botón de leído, y formulario de edición.
 
 import { $, esc, euro, fmtDate, coverHTML, toast, openDialog, closeTopLayer, closeAllLayers, confirmSheet, parsePrice, parseIntOrNull, seriesKey, today } from './util.js';
-import { state, byId, byIsbn, saveComic, removeComic, setRead, saveSeriesMeta, setSetting } from './store.js';
-import { lookupCode, normalizeIsbn, parseTitle, normalizePublisher, guessType } from './lookup.js';
+import { state, byId, byIsbn, saveComic, removeComic, setRead, saveSeriesMeta, setSetting, wishToOwned } from './store.js';
+import { lookupCode, normalizeIsbn, parseTitle, normalizePublisher, guessType, fetchRatings, ratingLinks } from './lookup.js';
 import { uid } from './db.js';
 import { catalogSeriesFor } from './catalog.js';
 
@@ -25,59 +25,122 @@ export function refreshDetail() {
   if ($('#sheet-detail').open) renderDetail();
 }
 
+const stars = (n) => [1, 2, 3, 4, 5].map((i) => `<button class="star${i <= (n || 0) ? ' on' : ''}" data-star="${i}" aria-label="${i} de 5" aria-pressed="${i <= (n || 0)}">★</button>`).join('');
+const fmtAvg = (x) => (Math.round(x * 10) / 10).toLocaleString('es-ES');
+
 function renderDetail() {
   const c = byId(shownId);
   if (!c) { if ($('#sheet-detail').open) closeTopLayer(); return; }
+  const wish = c.status === 'deseo';
   const read = c.reading === 'leido';
+  // Fechas que se pueden cambiar tocándolas
+  const dateBtn = (field, v) => `<button class="date-edit" data-date="${field}">${v ? esc(fmtDate(v)) : 'Poner fecha'}</button>`;
   const facts = [
-    ['Editorial', c.publisher],
-    ['Precio', c.price != null ? euro(c.price) : ''],
-    ['Publicado', fmtDate(c.publishedDate)],
-    ['Lo compraste', fmtDate(c.purchaseDate)],
-    ['Autores', c.authors],
-    ['Páginas', c.pages],
-    [c.issn ? 'ISSN' : 'ISBN', c.issn || c.isbn],
+    ['Editorial', esc(c.publisher)],
+    ['Precio', c.price != null ? esc(euro(c.price)) : ''],
+    ['Publicado', esc(fmtDate(c.publishedDate))],
+    ['Lo compraste', wish ? '' : dateBtn('purchaseDate', c.purchaseDate)],
+    ['Leído el', !wish && read ? dateBtn('readAt', c.readAt) : ''],
+    ['Autores', esc(c.authors)],
+    ['Páginas', esc(c.pages)],
+    [c.issn ? 'ISSN' : 'ISBN', esc(c.issn || c.isbn)],
   ].filter(([, v]) => v);
-  $('#detail-heading').textContent = c.series || 'Cómic';
+  $('#detail-heading').textContent = wish ? 'Deseado' : (c.series || 'Cómic');
   $('#detail-body').innerHTML = `
     <div class="detail-top">
       <div class="detail-cover">${coverHTML(c, { lazy: false })}</div>
       <div class="detail-head">
         <h3>${esc(c.title)}</h3>
         ${c.series ? `<button class="link" id="detail-series">${esc(c.series)}${c.number != null && !catalogSeriesFor(c.series)?.unnumbered ? `, nº ${esc(c.number)}` : ''}</button>` : ''}
-        <button class="read-toggle${read ? ' is-read' : ''}" id="detail-read" aria-pressed="${read}">
-          <span class="stamp" lang="ja" aria-hidden="true">済</span><span>${read ? `Leído${c.readAt ? ` el ${esc(fmtDate(c.readAt))}` : ''}` : 'Marcar como leído'}</span>
-        </button>
+        ${wish
+          ? '<button class="btn primary wide" id="detail-own">Ya lo tengo</button>'
+          : `<button class="read-toggle${read ? ' is-read' : ''}" id="detail-read" aria-pressed="${read}">
+          <span class="stamp" lang="ja" aria-hidden="true">済</span><span>${read ? 'Leído' : 'Marcar como leído'}</span>
+        </button>`}
       </div>
     </div>
-    ${facts.length ? `<dl class="facts">${facts.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>` : ''}
+    ${facts.length ? `<dl class="facts">${facts.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${v}</dd></div>`).join('')}</dl>` : ''}
     ${c.notes ? `<p class="detail-notes">${esc(c.notes)}</p>` : ''}
+    ${wish ? '' : `
+    <section class="rating-block">
+      <h4>Tu nota</h4>
+      <div class="stars" role="group" aria-label="Tu nota de 1 a 5">${stars(c.rating)}</div>
+      ${c.review ? `<p class="review">${esc(c.review)}</p>` : ''}
+      <details class="review-edit"${c.review ? '' : ''}>
+        <summary>${c.review ? 'Editar reseña' : 'Escribir una reseña'}</summary>
+        <textarea id="review-text" rows="4" placeholder="Qué te ha parecido…">${esc(c.review || '')}</textarea>
+        <button class="btn small primary" id="review-save">Guardar reseña</button>
+      </details>
+    </section>`}
+    <section class="rating-block">
+      <h4>Notas de otros lectores</h4>
+      <div id="detail-ext"><p class="muted small">${c.isbn ? 'Buscando notas…' : ''}</p></div>
+      <div class="ext-links">${ratingLinks(c).map((l) => `<a class="ext" href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.source)}</a>`).join('')}</div>
+    </section>
     <div class="btn-row detail-actions">
       <button class="btn" id="detail-edit">Editar</button>
-      <button class="btn danger" id="detail-delete">Eliminar</button>
-    </div>`;
+      <button class="btn danger" id="detail-delete">${wish ? 'Quitar de deseados' : 'Eliminar'}</button>
+    </div>
+    <input type="date" id="date-picker" class="date-picker" tabindex="-1" aria-hidden="true">`;
+  loadExternal(c);
 }
+
+async function loadExternal(c) {
+  const id = c.id;
+  const list = c.isbn ? await fetchRatings(c.isbn) : [];
+  if (shownId !== id || !$('#detail-ext')) return;
+  $('#detail-ext').innerHTML = list.length
+    ? list.map((r) => `<a class="ext-score" href="${esc(r.url)}" target="_blank" rel="noopener"><b>${fmtAvg(r.avg)}</b><span>/5 en ${esc(r.source)}, ${r.count} ${r.count === 1 ? 'voto' : 'votos'}</span></a>`).join('')
+    : '<p class="muted small">Esta edición no tiene notas en Google Books ni Open Library. Consúltalas en:</p>';
+}
+
+$('#detail-body').addEventListener('change', async (e) => {
+  if (e.target.id !== 'date-picker') return;
+  const c = byId(shownId);
+  const field = e.target.dataset.field;
+  if (!c || !field) return;
+  await saveComic({ ...c, [field]: e.target.value || null });
+  toast(field === 'readAt' ? 'Fecha de lectura cambiada' : 'Fecha de compra cambiada');
+});
 
 $('#detail-body').addEventListener('click', async (e) => {
   const c = byId(shownId);
   if (!c) return;
   const t = e.target.closest('button');
   if (!t) return;
-  if (t.id === 'detail-read') {
+  if (t.dataset.date) {
+    const p = $('#date-picker');
+    p.dataset.field = t.dataset.date;
+    p.value = c[t.dataset.date] || today();
+    try { p.showPicker(); } catch { p.focus(); p.click(); }
+  } else if (t.dataset.star) {
+    const n = +t.dataset.star;
+    const rating = c.rating === n ? null : n;   // tocar la misma estrella la quita
+    await saveComic({ ...c, rating, ratedAt: rating ? today() : null });
+  } else if (t.id === 'review-save') {
+    await saveComic({ ...c, review: $('#review-text').value.trim() });
+    toast('Reseña guardada');
+  } else if (t.id === 'detail-read') {
     const read = c.reading !== 'leido';
     await setRead(c, read);
     renderDetail();
     toast(read ? 'Marcado como leído' : 'Marcado como sin leer');
+  } else if (t.id === 'detail-own') {
+    await wishToOwned(c);
+    toast(`Añadido a tu biblioteca: ${c.title}`);
   } else if (t.id === 'detail-edit') {
     openEditor({ ...c });
   } else if (t.id === 'detail-series') {
     hooks.openSeries?.(seriesKey(c.series));
   } else if (t.id === 'detail-delete') {
-    const ok = await confirmSheet({ title: 'Eliminar cómic', text: `¿Quitar «${c.title}» de tu biblioteca?`, ok: 'Eliminar', danger: true });
+    const wish = c.status === 'deseo';
+    const ok = await confirmSheet(wish
+      ? { title: 'Quitar de deseados', text: `¿Quitar «${c.title}» de tus deseados?`, ok: 'Quitar', danger: true }
+      : { title: 'Eliminar cómic', text: `¿Quitar «${c.title}» de tu biblioteca?`, ok: 'Eliminar', danger: true });
     if (!ok) return;
     await removeComic(c.id);
     closeAllLayers();
-    toast('Eliminado', 'Deshacer', () => saveComic(c));
+    toast(wish ? 'Quitado de deseados' : 'Eliminado', 'Deshacer', () => saveComic(c));
   }
 });
 
@@ -113,6 +176,8 @@ export function openEditor(d, { isNew = false, notice = '', warn = false } = {})
   F.number.value = d.number ?? '';
   F.price.value = d.price != null ? d.price.toFixed(2).replace('.', ',') : '';
   F.purchaseDate.value = d.purchaseDate || '';
+  F.readAt.value = d.readAt || '';
+  $('#read-field').hidden = d.status === 'deseo';
   F.publisher.value = d.publisher || '';
   F.authors.value = d.authors || '';
   F.isbn.value = d.isbn || '';
@@ -201,6 +266,8 @@ form.addEventListener('submit', async (e) => {
   if (!d.title) { F.title.focus(); toast('Ponle al menos un título'); return; }
   d.price = parsePrice(F.price.value);
   d.purchaseDate = F.purchaseDate.value || null;
+  d.readAt = F.readAt.value || null;
+  if (d.readAt) d.reading = 'leido';
   d.publisher = normalizePublisher(F.publisher.value);
   d.authors = F.authors.value.trim();
   d.isbn = d.issn ? '' : (normalizeIsbn(F.isbn.value) || F.isbn.value.replace(/\D/g, ''));
@@ -224,7 +291,9 @@ export async function commitDraft(d) {
     await saveSeriesMeta({ key: seriesKey(d.series), name: d.series, total: d.seriesTotal, finished: false });
   }
   delete d.seriesTotal;
-  d.status = 'coleccion';
+  // Editar un deseado no lo pasa a la colección; todo lo demás que se guarda aquí es tuyo
+  d.status = d.status === 'deseo' && byId(d.id)?.status === 'deseo' && !d.toOwn ? 'deseo' : 'coleccion';
+  delete d.toOwn;
   await saveComic(d);
   if (d.type && d.type !== 'otro' && d.type !== state.settings.lastType) setSetting('lastType', d.type);
   return d;

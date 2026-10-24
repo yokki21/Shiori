@@ -7,6 +7,8 @@
 // Datos en Firestore:
 //   users/{uid}/comics/{id}    un documento por cómic (borrados: { deleted: true })
 //   users/{uid}/series/{key}   datos de serie (total de tomos, terminada)
+//   users/{uid}                perfil: nombre de usuario y foto (reducida, en el propio documento)
+//   usernames/{nombre}         { uid }: reserva el nombre para que sea único
 // Conflictos: gana la versión con `updatedAt` más reciente.
 // Al abrir la app solo se descargan los cambios desde la última vez.
 
@@ -42,6 +44,7 @@ export async function initSync(h) {
       user = u;
       if (u) await hooks.beforeSync?.(u);
       hooks.onUser?.(u);
+      if (u) loadProfile().then((p) => p && hooks.onProfile?.(p)).catch(() => {});
       if (u) await startSync();
     });
   } catch (e) {
@@ -74,6 +77,41 @@ export const resetPassword = (email) => fb.sendPasswordResetEmail(auth, email);
 export async function signOutUser() {
   stopListening();
   await fb.signOut(auth);
+}
+
+// ---------- Perfil: nombre de usuario único y foto ----------
+export const USERNAME_RE = /^[a-z0-9_.]{3,20}$/;
+const userDoc = () => fb.doc(fs, 'users', user.uid);
+const nameDoc = (n) => fb.doc(fs, 'usernames', n);
+
+export async function loadProfile() {
+  if (!user) return null;
+  const snap = await fb.getDoc(userDoc());
+  const d = snap.exists() ? snap.data() : {};
+  return { username: d.username || '', photo: d.photo || '' };
+}
+
+export async function usernameFree(name) {
+  const snap = await fb.getDoc(nameDoc(name));
+  return !snap.exists() || snap.data().uid === user?.uid;
+}
+
+// Reserva el nombre y libera el anterior en una sola operación: si otro lo coge a la vez, falla
+export async function claimUsername(name, old) {
+  if (!user) throw Object.assign(new Error('Sin sesión'), { code: 'no-user' });
+  if (!USERNAME_RE.test(name)) throw Object.assign(new Error('Formato'), { code: 'bad-name' });
+  await fb.runTransaction(fs, async (tx) => {
+    const cur = await tx.get(nameDoc(name));
+    if (cur.exists() && cur.data().uid !== user.uid) throw Object.assign(new Error('Cogido'), { code: 'taken' });
+    if (!cur.exists()) tx.set(nameDoc(name), { uid: user.uid });
+    if (old && old !== name) tx.delete(nameDoc(old));
+    tx.set(userDoc(), { username: name, updatedAt: Date.now() }, { merge: true });
+  });
+}
+
+export async function savePhoto(photo) {
+  if (!user) return;
+  await fb.setDoc(userDoc(), { photo: photo || '', updatedAt: Date.now() }, { merge: true });
 }
 
 // ---------- Sincronización ----------

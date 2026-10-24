@@ -1,7 +1,8 @@
 // Series: las que tienes, qué números, cuántos faltan y cuánto costaría completarlas.
 
-import { $, esc, euro, plural, ranges, coverHTML, toast, openDialog, confirmSheet, parseIntOrNull } from '../util.js';
-import { byId, removeComic, saveSeriesMeta, state } from '../store.js';
+import { $, esc, euro, plural, ranges, seriesKey, coverHTML, toast, openDialog, confirmSheet, parseIntOrNull } from '../util.js';
+import { addWish } from './wish.js';
+import { byId, removeComic, saveSeriesMeta, state, wanted } from '../store.js';
 import { seriesList, findSeries, missingIssueData } from '../series.js';
 import { catalogIssue } from '../catalog.js';
 import { openDetail, newDraft, commitDraft } from '../comic.js';
@@ -61,6 +62,7 @@ export function renderSeriesSheet() {
     if (t.toLowerCase().startsWith(g.name.toLowerCase())) t = t.slice(g.name.length).replace(/^[.:]?\s*/, '');
     return esc(t || n);
   };
+  const wishNums = new Map(wanted().filter((c) => seriesKey(c.series || '') === g.key).map((c) => [c.number, c]));
   const cells = [];
   for (let n = 1; n <= g.max; n++) {
     const c = g.byNum.get(n);
@@ -68,7 +70,7 @@ export function renderSeriesSheet() {
       cells.push(`<button class="vol own${c.reading === 'leido' ? ' read' : ''}" data-id="${esc(c.id)}" aria-label="${loose ? label(n, c) : `Nº ${n}`}, lo tienes${c.reading === 'leido' ? ', leído' : ''}">${coverHTML(c)}<span class="vol-n${loose ? ' t' : ''}">${label(n, c)}</span>${c.reading === 'leido' ? '<span class="mark-read" title="Leído" lang="ja">済</span>' : ''}</button>`);
     } else {
       const it = g.cat ? catalogIssue(g.cat, n) : null;
-      cells.push(`<button class="vol miss" data-n="${n}" aria-label="${loose ? label(n) : `Nº ${n}`}, te falta">${coverHTML(it || { series: g.name, number: n })}<span class="vol-n${loose ? ' t' : ''}">${label(n)}</span>${it?.price != null ? `<span class="vol-price">${euro(it.price)}</span>` : ''}</button>`);
+      cells.push(`<button class="vol miss" data-n="${n}" aria-label="${loose ? label(n) : `Nº ${n}`}, te falta">${coverHTML(it || { series: g.name, number: n })}<span class="vol-n${loose ? ' t' : ''}">${label(n)}</span>${it?.price != null ? `<span class="vol-price">${euro(it.price)}</span>` : ''}${wishNums.has(n) ? '<span class="vol-wish">Deseado</span>' : ''}</button>`);
     }
   }
   const meta = state.seriesMeta.get(g.key) || {};
@@ -101,9 +103,20 @@ $('#series-body').addEventListener('click', async (e) => {
   const miss = e.target.closest('.vol.miss');
   if (miss) {
     const n = +miss.dataset.n;
-    const ok = await confirmSheet({ title: `${g.name} ${n}`, text: '¿Lo tienes? Se añadirá a tu biblioteca.', ok: 'Lo tengo, añadir' });
+    const w = wanted().find((c) => seriesKey(c.series || '') === g.key && c.number === n);
+    const data = missingIssueData(g, n);
+    const ok = await confirmSheet({
+      title: data.title || `${g.name} ${n}`,
+      text: w ? 'Lo tienes en deseados. ¿Ya es tuyo?' : '¿Lo tienes? Se añadirá a tu biblioteca. Si aún no, puedes apuntarlo en deseados.',
+      ok: 'Lo tengo, añadir', alt: w ? '' : 'Lo quiero: a deseados',
+    });
     if (!ok) return;
-    const d = await commitDraft(newDraft(missingIssueData(g, n)));
+    if (ok === 'alt') {
+      const d = await addWish(data);
+      toast(`Añadido a deseados: ${d.title}`, 'Deshacer', () => removeComic(d.id));
+      return;
+    }
+    const d = await commitDraft(newDraft(data));
     toast(`Añadido: ${d.title}`, 'Deshacer', () => removeComic(d.id));
     return;
   }

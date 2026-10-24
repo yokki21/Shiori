@@ -149,3 +149,27 @@ export function searchCatalog(q, limit = 20) {
     .slice(0, limit)
     .map(({ e }) => ({ ...e.get(), fromCatalog: true }));
 }
+
+// Series del catálogo cuyo nombre contiene lo buscado (para añadir una serie entera a deseados)
+export function searchCatalogSeries(q, limit = 5) {
+  if (!data) return [];
+  const words = fold(q).split(/[^a-z0-9]+/).filter((w) => w && !/^\d+$/.test(w));
+  if (!words.length) return [];
+  const name = words.join(' ');
+  const hits = [];
+  for (const s of data.series || []) {
+    const k = key(s.name);
+    if (!words.every((w) => k.includes(w))) continue;
+    hits.push({ s, sc: k === name ? 0 : k.startsWith(name) ? 1 : 2, n: Object.keys(s.issues).length });
+  }
+  hits.sort((a, b) => a.sc - b.sc || b.n - a.n);
+  return hits.slice(0, limit).map(({ s }) => s);
+}
+
+// Todos los números de una serie del catálogo (solo los ya publicados si `released`)
+export function catalogSeriesItems(series, { released = true } = {}) {
+  const now = new Date().toISOString().slice(0, 10);
+  return Object.keys(series.issues)
+    .filter((n) => !released || !series.issues[n].date || series.issues[n].date <= now)
+    .map((n) => catalogIssue(series, n));
+}

@@ -1,7 +1,7 @@
 // Escanear y añadir: cámara, código escrito, foto y búsqueda por título.
 
 import { $, esc, euro, seriesKey, coverHTML, toast, haptic, openDialog, closeAllLayers, pushLayer, closeTopLayer } from './util.js';
-import { state, byIsbn, byIssue, saveComic, removeComic } from './store.js';
+import { state, byIsbn, byIssue, saveComic, removeComic, wishToOwned } from './store.js';
 import { Scanner, scanFile } from './scanner.js';
 import { lookupCode, searchTitle, normalizeIsbn, isIsbn, isIssnEan, issnFromEan, eanFromIssn } from './lookup.js';
 import { loadCatalog, catalogSeries, catalogIssue, catalogByIsbn, catalogByIssue, catalogAddons, catalogNextIssue, searchCatalog } from './catalog.js';
@@ -126,6 +126,7 @@ export async function handleCode(code, { addon = null } = {}) {
   await loadCatalog();
   if (isIssnEan(code)) return handleIssn(code, addon);
   const existing = byIsbn(code);
+  if (existing?.status === 'deseo') return announceAdded(await wishToOwned(existing)); // lo deseabas y ya lo tienes
   if (existing) return announceExisting(existing);
 
   const fromCat = catalogByIsbn(code);

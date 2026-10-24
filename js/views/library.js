@@ -24,6 +24,7 @@ export function renderLibrary() {
     recent: (a, b) => (b.createdAt || 0) - (a.createdAt || 0),
     series: bySeries,
     title: (a, b) => norm(a.title).localeCompare(norm(b.title), 'es'),
+    rating: (a, b) => (b.rating || 0) - (a.rating || 0) || (b.createdAt || 0) - (a.createdAt || 0),
   };
   list = [...l].sort(sorters[state.settings.sort] || sorters.recent);
 

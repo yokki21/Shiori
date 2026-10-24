@@ -367,3 +367,47 @@ function enrich(d) {
     type: guessType(publisher, d.categories, d.title),
   };
 }
+
+// ---------- Notas en otras plataformas ----------
+// Google Books y Open Library dan la nota media por ISBN (las ediciones españolas rara vez tienen).
+// Comic Book Roundup, League of Comic Geeks y Goodreads no dejan leerse desde una web: se enlazan.
+const ratingCache = new Map();
+const withTimeout = (p, ms = 6000) => Promise.race([p, new Promise((_, r) => setTimeout(() => r(new Error('timeout')), ms))]);
+
+export async function fetchRatings(isbn) {
+  if (!isbn) return [];
+  if (ratingCache.has(isbn)) return ratingCache.get(isbn);
+  const out = [];
+  const tasks = [
+    withTimeout(fetch(gbUrl(`q=isbn:${isbn}&fields=items(volumeInfo(averageRating,ratingsCount,infoLink))`)).then((r) => (r.ok ? r.json() : null))).then((j) => {
+      const v = j?.items?.[0]?.volumeInfo;
+      if (v?.ratingsCount) out.push({ source: 'Google Books', avg: v.averageRating, count: v.ratingsCount, url: v.infoLink });
+    }).catch(() => {}),
+    withTimeout(fetch(`https://openlibrary.org/isbn/${isbn}.json`).then((r) => (r.ok ? r.json() : null))).then(async (b) => {
+      const w = b?.works?.[0]?.key;
+      if (!w) return;
+      const r = await withTimeout(fetch(`https://openlibrary.org${w}/ratings.json`).then((x) => x.json()));
+      if (r?.summary?.count) out.push({ source: 'Open Library', avg: r.summary.average, count: r.summary.count, url: `https://openlibrary.org${w}` });
+    }).catch(() => {}),
+  ];
+  await Promise.all(tasks);
+  ratingCache.set(isbn, out);
+  return out;
+}
+
+// Texto para buscar el cómic en otras webs: sin el nombre de la colección de Panini delante
+export function searchQuery(c) {
+  let t = (c.title || c.series || '').replace(/\s+/g, ' ').trim();
+  const m = t.match(/^(?:Marvel|DC|100% Marvel|Biblioteca|Colección|Obras Maestras)[^.]*\.\s+(.+)$/i);
+  if (m) t = m[1];
+  return t.replace(/\s*\([^)]*\)\s*$/, '');
+}
+
+export function ratingLinks(c) {
+  const q = encodeURIComponent(searchQuery(c));
+  return [
+    { source: 'Goodreads', url: `https://www.goodreads.com/search?q=${q}` },
+    { source: 'League of Comic Geeks', url: `https://leagueofcomicgeeks.com/search?keyword=${q}` },
+    { source: 'Comic Book Roundup', url: `https://comicbookroundup.com/search_results.php?f_search=${q}` },
+  ];
+}

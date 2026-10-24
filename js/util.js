@@ -142,7 +142,8 @@ export function setupDialogs() {
 }
 
 // ---------- Confirmación propia (en vez de confirm() del navegador) ----------
-export function confirmSheet({ title, text, ok = 'Aceptar', danger = false }) {
+// Hoja de confirmación. Con `alt`, ofrece una segunda acción y devuelve 'alt' si se elige.
+export function confirmSheet({ title, text, ok = 'Aceptar', danger = false, alt = '' }) {
   return new Promise((resolve) => {
     const dlg = $('#sheet-confirm');
     $('#confirm-title').textContent = title;
@@ -150,9 +151,13 @@ export function confirmSheet({ title, text, ok = 'Aceptar', danger = false }) {
     const okBtn = $('#confirm-ok');
     okBtn.textContent = ok;
     okBtn.className = `btn wide ${danger ? 'danger-solid' : 'primary'}`;
+    const altBtn = $('#confirm-alt');
+    altBtn.hidden = !alt;
+    altBtn.textContent = alt;
     let answered = false;
     const finish = (v) => { if (answered) return; answered = true; resolve(v); };
     okBtn.onclick = () => { finish(true); closeTopLayer(); };
+    altBtn.onclick = () => { finish('alt'); closeTopLayer(); };
     dlg.addEventListener('close', () => finish(false), { once: true });
     openDialog(dlg);
   });

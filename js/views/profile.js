@@ -1,9 +1,9 @@
 // Perfil: estadísticas de la colección, cuenta y ajustes.
 
 import { $, esc, euro, euroShort, plural, MONTHS, MONTHS_LONG, toast, openDialog, closeTopLayer, confirmSheet } from '../util.js';
-import { state, owned, setSetting, wipeLocal, backupFile, parseBackup, importBackup } from '../store.js';
+import { state, owned, wanted, setSetting, setProfile, wipeLocal, backupFile, parseBackup, importBackup } from '../store.js';
 import { seriesList } from '../series.js';
-import { syncAvailable, signIn, signUp, signInGoogle, resetPassword, signOutUser, authMessage } from '../sync.js';
+import { syncAvailable, signIn, signUp, signInGoogle, resetPassword, signOutUser, authMessage, USERNAME_RE, claimUsername, usernameFree, savePhoto } from '../sync.js';
 import { setGoogleKey, testGoogle } from '../lookup.js';
 import { db } from '../db.js';
 
@@ -42,22 +42,38 @@ function stats() {
     const p = pubs.get(k) || { n: 0, sum: 0 };
     p.n++; p.sum += c.price || 0; pubs.set(k, p);
   }
+  const ratedList = own.filter((c) => c.rating);
   return {
+    rated: ratedList.length, avgRating: ratedList.length ? ratedList.reduce((t, c) => t + c.rating, 0) / ratedList.length : 0,
     own, priced, spent, read, groups, complete, toComplete, approx, months,
     pubs: [...pubs].sort((a, b) => b[1].n - a[1].n),
     yearSpent: thisYear.reduce((s, c) => s + (c.price || 0), 0), yearN: thisYear.length, year, priciest,
   };
 }
 
+// Foto de perfil, o la inicial del nombre como sello
+export function avatarHTML(big = false) {
+  const p = state.profile;
+  const u = state.user;
+  const initial = (p.username || u?.email || 'S')[0].toUpperCase();
+  return p.photo && u
+    ? `<div class="avatar photo${big ? ' big' : ''}" aria-hidden="true"><img src="${esc(p.photo)}" alt=""></div>`
+    : `<div class="avatar${big ? ' big' : ''}" aria-hidden="true">${esc(initial)}</div>`;
+}
+
 export function renderProfile() {
   const s = stats();
   const u = state.user;
-  const who = u ? (u.displayName || u.email) : 'Tu colección';
+  const p = state.profile;
+  const who = u ? (p.username ? `@${p.username}` : (u.displayName || u.email)) : 'Tu colección';
+  const sub = u
+    ? (p.username ? esc(state.syncStatus || 'Guardado en tu cuenta') : 'Elige tu nombre de usuario en «Cuenta»')
+    : (syncAvailable ? 'Sin cuenta: tus cómics solo están en este dispositivo' : 'Tus cómics están guardados en este dispositivo');
   $('#profile-head').innerHTML = `
-    <div class="avatar" aria-hidden="true">${esc((u?.email || 'S')[0].toUpperCase())}</div>
+    ${avatarHTML()}
     <div class="who">
       <h2>${esc(who)}</h2>
-      <p class="muted small">${u ? esc(state.syncStatus || 'Guardado en tu cuenta') : (syncAvailable ? 'Sin cuenta: tus cómics solo están en este dispositivo' : 'Tus cómics están guardados en este dispositivo')}</p>
+      <p class="muted small">${sub}</p>
     </div>
     ${syncAvailable ? `<button class="btn small" id="open-account">${u ? 'Cuenta' : 'Crear cuenta'}</button>` : ''}`;
 
@@ -83,6 +99,8 @@ export function renderProfile() {
       <div class="rc"><span class="l">Leídos</span><i class="dots"></i><b class="v">${s.read} (${pctRead}%)</b></div>
       <div class="rc"><span class="l">${s.groups.length === 1 ? 'Serie' : 'Series'}${s.complete ? ` (${s.complete} completa${s.complete === 1 ? '' : 's'})` : ''}</span><i class="dots"></i><b class="v">${s.groups.length}</b></div>
       <div class="rc"><span class="l">Gastado en ${s.year}</span><i class="dots"></i><b class="v">${euroShort(s.yearSpent)}</b></div>
+      ${wanted().length ? `<div class="rc"><span class="l">Deseados</span><i class="dots"></i><b class="v">${wanted().length}</b></div>` : ''}
+      ${s.rated ? `<div class="rc"><span class="l">Tu nota media (${s.rated})</span><i class="dots"></i><b class="v">${s.avgRating.toLocaleString('es-ES', { maximumFractionDigits: 1 })} ★</b></div>` : ''}
       <div class="rc"><span class="l">Completar tus series</span><i class="dots"></i><b class="v">${s.toComplete ? `${s.approx ? '≈ ' : ''}${euroShort(s.toComplete)}` : '—'}</b></div>
       <div class="rc total"><span class="l">Total invertido</span><i class="dots"></i><b class="v">${euroShort(s.spent)}</b></div>
     </div>
@@ -196,6 +214,9 @@ export function renderAccount() {
   $('#account-login').hidden = !!u;
   $('#account-in').hidden = !u;
   if (u) {
+    $('#acc-avatar').outerHTML = avatarHTML(true).replace('class="avatar', 'id="acc-avatar" class="avatar');
+    $('#acc-photo-remove').hidden = !state.profile.photo;
+    if (document.activeElement !== $('#acc-username')) $('#acc-username').value = state.profile.username || '';
     $('#acc-who').textContent = u.email || u.displayName || 'tu cuenta';
     $('#sync-status').textContent = state.syncStatus;
     $('#acc-pass').value = '';
@@ -227,6 +248,65 @@ function setupAccount() {
       msg(authMessage(err));
     }
   });
+  // Nombre de usuario: único; se comprueba al escribir y se reserva al guardar
+  const nameMsg = (t, cls = '') => { const m = $('#acc-name-msg'); m.textContent = t; m.className = `small ${cls || 'muted'}`; };
+  const HINT = 'De 3 a 20 caracteres: letras minúsculas, números, punto y guion bajo. Es único: nadie más puede tener el mismo.';
+  let checkTimer;
+  $('#acc-username').addEventListener('input', (e) => {
+    const v = e.target.value.toLowerCase().replace(/\s+/g, '');
+    if (v !== e.target.value) e.target.value = v;
+    clearTimeout(checkTimer);
+    if (!v || v === state.profile.username) { nameMsg(HINT); return; }
+    if (!USERNAME_RE.test(v)) { nameMsg(HINT, 'warn-text'); return; }
+    checkTimer = setTimeout(async () => {
+      try {
+        const free = await usernameFree(v);
+        if ($('#acc-username').value === v) nameMsg(free ? `@${v} está libre.` : `@${v} ya lo tiene otra persona.`, free ? 'ok-text' : 'warn-text');
+      } catch { nameMsg(HINT); }
+    }, 350);
+  });
+  $('#acc-name-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const v = $('#acc-username').value.trim().toLowerCase();
+    if (!USERNAME_RE.test(v)) { nameMsg(HINT, 'warn-text'); return; }
+    if (v === state.profile.username) return;
+    const btn = $('#acc-name-save');
+    btn.disabled = true;
+    try {
+      await claimUsername(v, state.profile.username);
+      await setProfile({ username: v });
+      nameMsg(`Ahora eres @${v}.`, 'ok-text');
+      toast(`Nombre de usuario: @${v}`);
+    } catch (err) {
+      nameMsg(err.code === 'taken' ? `@${v} ya lo tiene otra persona. Prueba con otro.`
+        : err.code === 'permission-denied' ? 'El servidor no deja guardar nombres: falta actualizar las reglas de Firestore.'
+        : 'No se ha podido guardar. Comprueba la conexión.', 'warn-text');
+    } finally { btn.disabled = false; }
+  });
+
+  // Foto de perfil: se recorta en cuadrado y se reduce para guardarla en la cuenta
+  $('#acc-photo').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    try {
+      const bmp = await createImageBitmap(file);
+      const side = Math.min(bmp.width, bmp.height);
+      const cv = document.createElement('canvas');
+      cv.width = cv.height = 240;
+      cv.getContext('2d').drawImage(bmp, (bmp.width - side) / 2, (bmp.height - side) / 2, side, side, 0, 0, 240, 240);
+      const photo = cv.toDataURL('image/jpeg', 0.82);
+      await savePhoto(photo);
+      await setProfile({ photo });
+      toast('Foto de perfil cambiada');
+    } catch (err) {
+      toast(err?.code === 'permission-denied' ? 'El servidor no deja guardar la foto: revisa las reglas de Firestore.' : 'No se ha podido guardar la foto');
+    }
+  });
+  $('#acc-photo-remove').addEventListener('click', async () => {
+    try { await savePhoto(''); await setProfile({ photo: '' }); toast('Foto quitada'); } catch { toast('No se ha podido quitar la foto'); }
+  });
+
   $('#acc-out').addEventListener('click', async () => {
     await signOutUser();
     closeTopLayer();

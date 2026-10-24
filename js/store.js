@@ -10,6 +10,7 @@ export const state = {
   deleted: {}, // id → fecha de borrado (para que los borrados lleguen a la nube)
   settings: { autoAdd: true, lastType: 'manga', sort: 'recent', googleKey: '' },
   user: null,
+  profile: { username: '', photo: '' }, // de la cuenta: nombre de usuario único y foto
   syncStatus: '',
 };
 
@@ -49,6 +50,13 @@ export function owned() {
   return ownedCache.list;
 }
 
+let wantedCache = { v: -1, list: [] };
+// Deseados: cómics que quieres y aún no tienes (estado «deseo»)
+export function wanted() {
+  if (wantedCache.v !== version) wantedCache = { v: version, list: state.comics.filter((c) => c.status === 'deseo') };
+  return wantedCache.list;
+}
+
 export async function loadStore() {
   const [comics, series, settings, deleted] = await Promise.all([
     db.all('comics'), db.all('series'), db.getKv('settings'), db.getKv('deleted'),
@@ -62,6 +70,7 @@ export async function loadStore() {
   state.comics = comics.map(migrate);
   for (const s of series) state.seriesMeta.set(s.key, s);
   state.deleted = deleted || {};
+  Object.assign(state.profile, (await db.getKv('profile')) || {});
   reindex();
   // Guarda las migraciones que haya hecho falta
   const fixed = state.comics.filter((c, i) => c !== comics[i]);
@@ -110,7 +119,19 @@ export async function removeComic(id) {
 }
 
 export async function setRead(c, read) {
-  return saveComic({ ...c, reading: read ? 'leido' : 'pendiente', readAt: read ? today() : null });
+  return saveComic({ ...c, reading: read ? 'leido' : 'pendiente', readAt: read ? (c.readAt || today()) : null });
+}
+
+// Un deseado que ya tienes: pasa a la colección con la fecha de compra de hoy
+export async function wishToOwned(c) {
+  const now = Date.now();
+  return saveComic({ ...c, status: 'coleccion', purchaseDate: today(), createdAt: now });
+}
+
+export async function setProfile(p) {
+  Object.assign(state.profile, p);
+  await db.setKv('profile', state.profile);
+  changed();
 }
 
 export async function saveSeriesMeta(meta) {
@@ -130,6 +151,8 @@ export async function wipeLocal() {
   state.comics = [];
   state.seriesMeta.clear();
   state.deleted = {};
+  state.profile = { username: '', photo: '' };
+  await db.setKv('profile', null);
   reindex();
   changed();
 }
@@ -192,7 +215,7 @@ export async function importBackup(data) {
 }
 
 // ---------- Nube ----------
-export function startCloud({ onUser, onStatus, onSynced }) {
+export function startCloud({ onUser, onStatus, onSynced, onProfile }) {
   return initSync({
     getLocal: () => ({ comics: state.comics, series: state.seriesMeta, deleted: state.deleted }),
     // Los datos del móvil pertenecen a una cuenta: si entra otra, no se mezclan
@@ -225,7 +248,12 @@ export function startCloud({ onUser, onStatus, onSynced }) {
       state.seriesMeta.set(meta.key, meta);
       changed();
     },
-    onUser(u) { state.user = u; onUser?.(u); },
+    onUser(u) {
+      state.user = u;
+      if (!u) { state.profile = { username: '', photo: '' }; db.setKv('profile', null); }
+      onUser?.(u);
+    },
+    async onProfile(p) { await setProfile(p); onProfile?.(p); },
     onStatus(t) { state.syncStatus = t; onStatus?.(t); },
     onSynced,
   });
