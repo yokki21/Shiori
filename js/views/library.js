@@ -3,6 +3,7 @@
 import { $, $$, esc, norm, seriesKey, plural, coverHTML } from '../util.js';
 import { state, owned, byId, setSetting } from '../store.js';
 import { openDetail } from '../comic.js';
+import { renderSeries } from './series.js';
 
 const PAGE = 60;
 const filters = { q: '', read: '' };
@@ -64,15 +65,38 @@ function more() {
   }
 }
 
+// Biblioteca y Series son la misma sección: un selector cambia entre ver cómics o ver series.
+// El buscador sirve para los dos.
+export const libMode = () => (state.settings.libMode === 'series' ? 'series' : 'comics');
+
+export function renderLibraryView() {
+  const mode = libMode();
+  $$('#lib-mode .seg-btn').forEach((b) => { const on = b.dataset.mode === mode; b.classList.toggle('on', on); b.setAttribute('aria-selected', String(on)); });
+  $('#lib-comics').hidden = mode !== 'comics';
+  $('#lib-series').hidden = mode !== 'series';
+  $('#lib-row').hidden = mode === 'series';
+  $('#lib-search').placeholder = mode === 'series' ? 'Buscar en tus series' : 'Buscar en tu biblioteca';
+  $('#screen-tag').textContent = mode === 'series' ? '全巻' : '本棚';
+  if (mode === 'series') { $('#lib-tools').hidden = !owned().length; renderSeries(filters.q); } else renderLibrary();
+}
+
+export async function setLibMode(mode) {
+  if (mode === libMode()) return;
+  await setSetting('libMode', mode);
+  renderLibraryView();
+  window.scrollTo({ top: 0 });
+}
+
 let searchTimer;
 export function setupLibrary() {
+  $('#lib-mode').addEventListener('click', (e) => { const b = e.target.closest('.seg-btn'); if (b) setLibMode(b.dataset.mode); });
   $('#lib-grid').addEventListener('click', (e) => {
     const b = e.target.closest('.book');
     if (b) openDetail(byId(b.dataset.id));
   });
   $('#lib-search').addEventListener('input', (e) => {
     clearTimeout(searchTimer);
-    searchTimer = setTimeout(() => { filters.q = e.target.value; renderLibrary(); }, 150);
+    searchTimer = setTimeout(() => { filters.q = e.target.value; renderLibraryView(); }, 150);
   });
   $('#lib-filters').addEventListener('click', (e) => {
     const b = e.target.closest('.chip');

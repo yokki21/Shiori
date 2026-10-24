@@ -55,6 +55,9 @@ def parse_page(h):
     img = ''
     if ld and '/media/catalog/product/' in ld.group(2):
         img = ld.group(2).replace('\\/', '/').split('/media/catalog/product/')[1].split('?')[0]
+    if not img:   # si no, la imagen de la ficha para redes sociales
+        m = re.search(r'og:image" content="[^"]*/media/catalog/product/([^"?]+)', h)
+        img = m.group(1) if m else ''
     price = re.search(r'data-price-amount="([\d.]+)"\s+data-price-type="oldPrice"', h) or re.search(r'data-price-amount="([\d.]+)"\s+data-price-type="finalPrice"', h)
     code = re.search(r'97[789]\d{10}', field(h, 'pnn_isbn'))
     return {

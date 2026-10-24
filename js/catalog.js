@@ -173,3 +173,22 @@ export function catalogSeriesItems(series, { released = true } = {}) {
     .filter((n) => !released || !series.issues[n].date || series.issues[n].date <= now)
     .map((n) => catalogIssue(series, n));
 }
+
+// Lo que aún no ha salido (fecha posterior a hoy), con su editorial y ordenado por fecha
+export function catalogUpcoming() {
+  if (!data) return [];
+  const now = new Date().toISOString().slice(0, 10);
+  const out = [];
+  for (const s of data.series || []) {
+    for (const [n, it] of Object.entries(s.issues || {})) {
+      if (it.date && it.date > now) out.push({ item: catalogIssue(s, n), line: s.line || '', series: s });
+    }
+  }
+  for (const it of data.extras || []) {
+    if (it.date && it.date > now) {
+      const { a, line, ...rest } = it;
+      out.push({ item: { publisher: 'Panini', type: 'americano', ...rest, cover: coverUrl(it.cover), publishedDate: it.date }, line: line || '', series: null });
+    }
+  }
+  return out.sort((x, y) => x.item.publishedDate.localeCompare(y.item.publishedDate) || (x.item.title || '').localeCompare(y.item.title || '', 'es'));
+}

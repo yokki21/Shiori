@@ -6,20 +6,22 @@ import { setGoogleKey } from './lookup.js';
 import { loadCatalog, catalogByIsbn } from './catalog.js';
 import { refreshDetail, setComicHooks } from './comic.js';
 import { openScanner, openAdd, handleCode } from './scan.js';
-import { renderLibrary, setupLibrary } from './views/library.js';
-import { renderSeries, renderSeriesSheet, setupSeries, openSeries } from './views/series.js';
+import { renderLibraryView, setupLibrary, setLibMode, libMode } from './views/library.js';
+import { renderUpcoming, setupUpcoming } from './views/upcoming.js';
+import { renderSeriesSheet, setupSeries, openSeries } from './views/series.js';
 import { renderProfile, renderSettings, renderAccount, setupProfile } from './views/profile.js';
 import { renderWish, setupWish, refreshWishResults } from './views/wish.js';
 
 const VIEWS = {
-  library: { title: 'Biblioteca', tag: '本棚', render: renderLibrary },
-  series: { title: 'Series', tag: '全巻', render: renderSeries },
+  library: { title: 'Biblioteca', tag: () => (libMode() === 'series' ? '全巻' : '本棚'), render: renderLibraryView },
+  new: { title: 'Novedades', tag: '新刊', render: renderUpcoming },
   wish: { title: 'Deseados', tag: '欲しい', render: renderWish },
   profile: { title: 'Perfil', tag: '記録', render: () => { renderProfile(); renderSettings(); } },
 };
 let current = 'library';
 
 function showView(name) {
+  if (name === 'series') { setLibMode('series'); name = 'library'; }   // Series vive dentro de Biblioteca
   current = name;
   $$('.view').forEach((v) => { v.hidden = v.id !== `view-${name}`; });
   $$('.tab[data-view]').forEach((t) => {
@@ -28,7 +30,8 @@ function showView(name) {
     if (on) t.setAttribute('aria-current', 'page'); else t.removeAttribute('aria-current');
   });
   $('#screen-title').textContent = VIEWS[name].title;
-  $('#screen-tag').textContent = VIEWS[name].tag;   // etiqueta de la balda: estantería, colección completa, registro
+  const tag = VIEWS[name].tag;
+  $('#screen-tag').textContent = typeof tag === 'function' ? tag() : tag;   // etiqueta de la balda: estantería, colección completa, registro
   VIEWS[name].render();
   window.scrollTo({ top: 0 });
 }
@@ -71,12 +74,13 @@ async function init() {
   setupSeries();
   setupProfile();
   setupWish();
+  setupUpcoming();
   onChange(render);
 
   $$('.tab[data-view]').forEach((t) => t.addEventListener('click', () => showView(t.dataset.view)));
   $('#btn-scan').addEventListener('click', openScanner);
   $('#btn-add').addEventListener('click', () => openAdd({ focus: true }));
-  $('#brand').addEventListener('click', () => showView('library'));   // el logo lleva a la página principal
+  $('#brand').addEventListener('click', () => { setLibMode('comics'); showView('library'); });   // el logo lleva a la página principal
   document.addEventListener('click', (e) => { if (e.target.closest('[data-action="scan"]')) openScanner(); });
 
   loadCatalog().then(fillFromCatalog).then(render);

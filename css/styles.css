@@ -566,3 +566,27 @@ dialog.confirm p { margin: 0 0 10px; }
 .ok-text { color: var(--ok); }
 .warn-text { color: var(--shu); }
 .search input::-webkit-search-cancel-button { filter: grayscale(1); opacity: .6; }
+
+/* ---------- Biblioteca: cómics o series ---------- */
+.seg { display: grid; grid-template-columns: 1fr 1fr; margin: 0 0 14px; border: 1.5px solid var(--sumi); border-radius: 4px; overflow: hidden; }
+.seg-btn { min-height: 40px; border: 0; background: transparent; color: var(--sumi); font-weight: 700; font-size: 15px; }
+.seg-btn + .seg-btn { border-left: 1.5px solid var(--sumi); }
+.seg-btn.on { background: var(--sumi); color: var(--washi); }
+
+/* ---------- Próximas novedades: el calendario de 新刊 ---------- */
+.new-filter { margin: 0 0 6px; }
+#new-list .section-title:first-of-type { margin-top: 18px; }
+#new-list .sub { margin: 0 0 4px; }
+.rel {
+  display: grid; grid-template-columns: 40px 46px 1fr auto; gap: 12px; align-items: center;
+  padding: 12px 0; border-bottom: 1px solid var(--rule);
+}
+.rel .cover { width: 46px; }
+.rel .cover-ph { padding: 4px; }
+.rel .cover-ph::before, .rel .cover-ph .t { display: none; }
+.rel .cover-ph .n { font-size: 17px; margin: auto; }
+.rel-date { display: grid; justify-items: center; line-height: 1.1; color: var(--sumi-2); font-size: 11px; }
+.rel-date b { font: 700 22px/1 var(--mincho); color: var(--sumi); }
+.rel.mine .rel-date b { color: var(--shu); }
+.rel .row-main b { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.rel:has(+ .rel .rel-date.same) { border-bottom: 1px dotted var(--rule); }

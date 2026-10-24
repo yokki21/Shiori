@@ -34,6 +34,7 @@
       <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
       <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
       <symbol id="i-ribbon" viewBox="0 0 24 24"><path d="M7 3.5h10v17l-5-4-5 4z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+      <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M3.5 9.5h17M8 3v4M16 3v4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
       <symbol id="i-camera" viewBox="0 0 24 24"><path d="M4 8h3l1.5-2h7L17 8h3v11H4z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="12" cy="13.5" r="3.3" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
     </defs>
   </svg>
@@ -52,12 +53,16 @@
 
     <main>
       <section class="view" id="view-library">
+        <div class="seg" id="lib-mode" role="tablist" aria-label="Ver la biblioteca por">
+          <button role="tab" class="seg-btn on" data-mode="comics" aria-selected="true">Cómics</button>
+          <button role="tab" class="seg-btn" data-mode="series" aria-selected="false">Series</button>
+        </div>
         <div class="toolbar" id="lib-tools" hidden>
           <label class="search">
             <svg aria-hidden="true"><use href="#i-search"/></svg>
             <input type="search" id="lib-search" placeholder="Buscar en tu biblioteca" autocomplete="off" aria-label="Buscar en tu biblioteca">
           </label>
-          <div class="toolbar-row">
+          <div class="toolbar-row" id="lib-row">
             <div class="chips" id="lib-filters" role="group" aria-label="Filtrar por lectura">
               <button class="chip on" data-read="" aria-pressed="true">Todos</button>
               <button class="chip" data-read="pendiente" aria-pressed="false">Sin leer</button>
@@ -71,13 +76,23 @@
             </select>
           </div>
         </div>
-        <p class="count" id="lib-count"></p>
-        <div class="shelf" id="lib-grid"></div>
+        <div id="lib-comics">
+          <p class="count" id="lib-count"></p>
+          <div class="shelf" id="lib-grid"></div>
+        </div>
+        <div id="lib-series" hidden>
+          <p class="count" id="series-count"></p>
+          <div id="series-list"></div>
+        </div>
       </section>
 
-      <section class="view" id="view-series" hidden>
-        <p class="count" id="series-count"></p>
-        <div id="series-list"></div>
+      <section class="view" id="view-new" hidden>
+        <div class="chips new-filter" id="new-filters" role="group" aria-label="Editorial">
+          <button class="chip on" data-line="" aria-pressed="true">Todas</button>
+          <button class="chip" data-line="Marvel" aria-pressed="false">Marvel</button>
+          <button class="chip" data-line="DC" aria-pressed="false">DC</button>
+        </div>
+        <div id="new-list"></div>
       </section>
 
       <section class="view" id="view-wish" hidden>
@@ -131,7 +146,7 @@
 
     <nav class="tabbar" aria-label="Secciones">
       <button class="tab on" data-view="library" aria-current="page"><svg aria-hidden="true"><use href="#i-shelf"/></svg><span>Biblioteca</span></button>
-      <button class="tab" data-view="series"><svg aria-hidden="true"><use href="#i-series"/></svg><span>Series</span></button>
+      <button class="tab" data-view="new"><svg aria-hidden="true"><use href="#i-calendar"/></svg><span>Novedades</span></button>
       <button class="hanko" id="btn-scan" aria-label="Escanear código de barras"><span class="seal" lang="ja" aria-hidden="true">読</span><span class="lbl">Escanear</span></button>
       <button class="tab" data-view="wish"><svg aria-hidden="true"><use href="#i-ribbon"/></svg><span>Deseados</span></button>
       <button class="tab" data-view="profile"><svg aria-hidden="true"><use href="#i-user"/></svg><span>Perfil</span></button>

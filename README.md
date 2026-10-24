@@ -9,6 +9,8 @@ App web instalable (PWA) en **https://yokki21.github.io/Shiori/**. Funciona sin 
 - **Escanear:** apuntas a la contraportada y se añade con portada, título, serie, número, editorial y precio. Lee ISBN (tomos) e ISSN con el número del suplemento de 2 o 5 cifras (grapas). Si la serie se reconoce pero no el número, eliges el número tocando su portada.
 - **Añadir sin cámara:** un buscador que entiende título, ISBN o ISSN, o leer el código desde una foto.
 - **Biblioteca:** tus portadas, con buscador y filtro de leídos. Al tocar un cómic ves toda su información y el botón **Marcar como leído**.
+- **Biblioteca y series en una sección:** un selector cambia entre ver tus cómics y ver tus series; el buscador vale para las dos.
+- **Próximas novedades:** lo que Panini aún no ha sacado, con fecha y precio; primero los números de tus series y tus deseados.
 - **Series:** cada serie que tienes, qué números, cuántos te faltan y cuánto costaría completarla. Desde ahí puedes añadir los que te falten.
 - **Deseados:** buscas en el catálogo una serie, grapa o tomo y lo apuntas (o la serie entera). Al escanearlo, pasa solo a la biblioteca.
 - **Notas:** tu nota de 1 a 5 y tu reseña; la nota de Google Books u Open Library si la hay, y enlaces a Goodreads, League of Comic Geeks y Comic Book Roundup.
@@ -16,7 +18,7 @@ App web instalable (PWA) en **https://yokki21.github.io/Shiori/**. Funciona sin 
 
 ## De dónde salen los datos
 
-1. **Catálogo propio** (`catalog/catalog.json`): todo Marvel y DC de Panini España, a la venta y agotado, sacado de su web oficial (listados, mapa del sitio y fichas de producto). Cada cómic lleva portada, precio, fecha, páginas y autores; los tomos, su ISBN, y las grapas, el código ISSN y el suplemento que trae su ficha. `tools/panini_raw.json` guarda lo recogido y `python3 tools/build_panini.py` regenera el catálogo; `tools/panini_manual.json` añade números que no salen en Panini.
+1. **Catálogo propio** (`catalog/catalog.json`): todo Marvel y DC de Panini España, a la venta y agotado, sacado de su web oficial (listados, mapa del sitio y fichas de producto). Cada cómic lleva portada, precio, fecha, páginas y autores; los tomos, su ISBN, y las grapas, el código ISSN y el suplemento que trae su ficha. `tools/panini_raw.json` guarda lo recogido y `python3 tools/build_panini.py` regenera el catálogo. Cada lunes, la tarea «Catálogo semanal» de GitHub ejecuta `tools/update_panini.py` (busca en el mapa del sitio de Panini las fichas nuevas de Marvel y DC y refresca las que salen pronto), regenera el catálogo y lo publica; `tools/panini_manual.json` añade números que no salen en Panini.
 2. **Google Books** (mejor con una clave propia, ver abajo) y **Open Library**.
 3. Lo que completas a mano se queda en tu biblioteca, y las grapas aprenden su serie a partir del primer número.
 

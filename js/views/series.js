@@ -14,10 +14,13 @@ const costText = (g) => {
   return `${g.costEstimated ? '≈ ' : ''}${euro(g.missingCost)} para completarla`;
 };
 
-export function renderSeries() {
-  const list = seriesList();
+export function renderSeries(q = '') {
+  const all = seriesList();
+  const key = seriesKey(q);
+  const list = key ? all.filter((g) => g.key.includes(key)) : all;
   const box = $('#series-list');
-  $('#series-count').textContent = list.length ? plural(list.length, 'serie', 'series') : '';
+  $('#series-count').textContent = all.length ? (key ? `${list.length} de ${plural(all.length, 'serie', 'series')}` : plural(all.length, 'serie', 'series')) : '';
+  if (all.length && !list.length) { box.innerHTML = '<div class="empty"><h2>Nada por aquí</h2><p>Ninguna serie coincide con la búsqueda.</p></div>'; return; }
   if (!list.length) {
     box.innerHTML = `<div class="empty"><div class="seal-big" lang="ja" aria-hidden="true">巻</div><h2>Aún no hay series</h2><p>Cuando añadas cómics con número (Absolute Batman 3, One Piece 12…) se agrupan aquí y verás cuáles te faltan.</p></div>`;
     return;
