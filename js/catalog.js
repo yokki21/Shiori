@@ -18,7 +18,9 @@ const byAddon = new Map();   // issn -> Map(número del suplemento -> ficha)
 let index = [];   // [{ t: título normalizado, get: () => ficha }] para la búsqueda
 const key = (s) => fold(s).replace(/[^a-z0-9]+/g, ' ').trim();
 
-const fold = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+// Sin tildes, en minúsculas y con las siglas juntas (D.I.O.S.E.S. → dioses, S.H.I.E.L.D. → shield)
+const fold = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+  .replace(/\b(?:[a-z0-9]\.){2,}[a-z0-9]?\.?/g, (m) => m.replace(/\./g, ''));
 
 const coverUrl = (c) => (!c || /^https?:/.test(c) ? c || null : `${data.img || ''}${c}${data.imgq || ''}`);
 

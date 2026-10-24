@@ -4,7 +4,8 @@ export const $ = (s, r = document) => r.querySelector(s);
 export const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 
 export const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-export const norm = (s) => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+export const norm = (s) => String(s ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+  .replace(/\b(?:[a-z0-9]\.){2,}[a-z0-9]?\.?/g, (m) => m.replace(/\./g, ''));   // siglas juntas: D.I.O.S.E.S. → dioses
 export const seriesKey = (name) => norm(name).replace(/[^a-z0-9]+/g, ' ').trim();
 
 const fmtEuro = new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' });

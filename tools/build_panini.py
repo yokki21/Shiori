@@ -3,7 +3,8 @@
 #
 # Entrada: {"keys": [...], "rows": [[...], ...]} con un producto por fila:
 #   sku, slug, title, price, date (dd/mm/aa), cat (marvel|dc), img (ruta de la portada), code (EAN de la imagen),
-#   addon (suplemento), listed (a la venta), y lo de la ficha: ptitle, pdate ("3 dic 2020"), pages, authors, pprice, pcode
+#   addon (suplemento), listed (a la venta), y lo de la ficha: ptitle, pdate ("3 dic 2020"), pages, authors, pprice, pcode,
+#   pissn (campo ISSN de las grapas: EAN 977 + suplemento)
 #
 # Salida (versión 2):
 #   series: [{name, publisher, type, ean?, issn?, issues: {"n": {title?, cover, price?, date?, isbn?, pages?, authors?}}}]
@@ -100,11 +101,16 @@ for r in rows:
     code = r.get('code') if ean_ok(r.get('code')) else None
     pcode = r.get('pcode') if ean_ok(r.get('pcode')) else None
     code = code or pcode
+    addon = r.get('addon')
+    # Grapas: la ficha trae el campo ISSN con el EAN 977 y el suplemento seguidos ("977293855500600005")
+    pissn = re.sub(r'\D', '', r.get('pissn') or '')
+    if not code and len(pissn) in (15, 18) and ean_ok(pissn[:13]):
+        code, addon = pissn[:13], pissn[13:]
     price = r.get('price') or r.get('pprice') or None
     p = {
         'sku': sku, 'title': re.sub(r'\s+', ' ', title), 'cover': r.get('img') or None,
         'price': round(float(price), 2) if price else None,
-        'date': iso(r.get('date'), r.get('pdate')), 'code': code, 'addon': r.get('addon'),
+        'date': iso(r.get('date'), r.get('pdate')), 'code': code, 'addon': addon,
         'listed': bool(r.get('listed')), 'cat': r.get('cat'),
         'pages': r.get('pages') or None, 'authors': html.unescape(r.get('authors') or '').strip() or None,
         'prefix': re.match(r'^([a-z]+)', sku.lower()).group(1) if re.match(r'^[a-z]+', sku.lower()) else sku,
