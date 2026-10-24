@@ -43,7 +43,7 @@ export function loadCatalog() {
           for (const [n, it] of Object.entries(s.issues || {})) {
             const get = () => catalogIssue(s, n);
             if (it.isbn) byIsbn.set(it.isbn, get);
-            if (it.issn || s.issn) addAddon(it.issn || s.issn, it.a ?? +n, get);
+            if ((it.issn || s.issn) && !it.noa) addAddon(it.issn || s.issn, it.a ?? +n, get);   // noa: su suplemento es de otro número
             index.push({ t: fold(it.title || `${s.name} ${n}`), s: fold(s.name), n: +n, get });
           }
         }
@@ -106,7 +106,7 @@ export function catalogNextIssue(issn, a) {
   if (!s) return null;
   let last = null;
   for (const [n, it] of Object.entries(s.issues)) {
-    if ((it.issn || s.issn) !== issn) continue;
+    if ((it.issn || s.issn) !== issn || it.noa) continue;
     const an = it.a ?? +n;
     if (!last || an > last.a) last = { a: an, n: +n, it };
   }

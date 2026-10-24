@@ -88,7 +88,17 @@ def category(p, prefix, manga_prefixes):
         return 'dc'
     if prefix in manga_prefixes or 'tankobon' in (p.get('binding') or '').lower():
         return 'manga'
+    # Fichas antiguas sin editorial original: se reconoce por los personajes del título
+    t = (p.get('title') or '').lower()
+    if not e and MARVEL_RE.search(t):
+        return 'marvel'
+    if not e and DC_RE.search(t):
+        return 'dc'
     return 'otros'
+
+
+MARVEL_RE = re.compile(r'marvel|spider|ara[ñn]a|x-men|patrulla-x|vengador|avengers|hulk|\bthor\b|lobezno|wolverine|masacre|deadpool|capit[aá]n am[eé]rica|capitana marvel|iron man|daredevil|fant[aá]stic|guardianes de la galaxia|inhumanos|s\.?h\.?i\.?e\.?l\.?d|pantera negra|veneno|venom|castigador|punisher|doctor extra[ñn]o|excalibur|merodeadores|nuevos mutantes|campeones|arma x|x-force|factor-x|motorista fantasma|ms\. marvel|loki|thanos|viuda negra|ojo de halc[oó]n|bruja escarlata|kang|magneto|cable|ultimate|nova\b|silver surfer|estela plateada|namor|eternos|runaways|thunderbolts|defensores|conan|secret wars|guerras secretas|infinit|imperio secreto|jane foster|valquiria|mapache cohete|inhuman|civil war|reinado del diablo|hombre-x|s\\.w\\.o\\.r\\.d|ragnar[oö]k|krakoa|dinast[ií]a de x|potencias de x|axis|siege|asedio|invasi[oó]n secreta|reino oscuro|vengadores|skrull|kree|miles morales|gwen|carnage|matanza')
+DC_RE = re.compile(r'batman|superman|wonder woman|\bflash\b|green lantern|linterna verde|aquaman|joker|harley|liga de la justicia|justice league|nightwing|catwoman|robin|titanes|green arrow|shazam|supergirl|batgirl|\bdc\b|sandman|vertigo|watchmen|constantine|hellblazer|lobo\b|darkseid')
 
 
 def main():

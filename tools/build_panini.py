@@ -360,8 +360,31 @@ for s in series.values():
             io['issn'] = it['issn']
         if it.get('addon') is not None and it['addon'] != n:
             io['a'] = it['addon']
+        if it['_p'].get('code'):
+            io['_coded'] = True
         o['issues'][str(n)] = io
     out_series.append(o)
+
+# Un suplemento de una colección ISSN es un solo cómic: si un suplemento deducido choca con otro,
+# gana el que trae el código de verdad (o el primero) y el deducido se queda sin él
+taken = {}
+for s in sorted(out_series, key=lambda s: 0 if any(i.get('_coded') for i in s['issues'].values()) else 1):
+    for n, io in s['issues'].items():
+        issn = io.get('issn') or s.get('issn')
+        if not issn:
+            continue
+        k = (issn, io.get('a', int(n)))
+        if k in taken:
+            io.pop('a', None)
+            io['a'] = None   # sin suplemento: no se reconoce al escanear, pero sigue en la serie
+        else:
+            taken[k] = True
+for s in out_series:
+    for io in s['issues'].values():
+        io.pop('_coded', None)
+        if 'a' in io and io['a'] is None:
+            del io['a']
+            io['noa'] = True
 
 # Series con el mismo nombre visible: la más reciente se queda el nombre y las demás llevan su año
 groups = defaultdict(list)
