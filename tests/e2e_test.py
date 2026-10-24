@@ -86,8 +86,9 @@ async def google(route):
 def jpeg():
     b = io.BytesIO(); Image.new('RGB', (64, 96), (200, 60, 60)).save(b, 'JPEG'); return b.getvalue()
 JPEG = jpeg()
-CONFIG = open(os.path.join(ROOT, 'js/config.js')).read().replace(
-    'export const FIREBASE_CONFIG = null;', "export const FIREBASE_CONFIG = { apiKey: 'test', projectId: 'test' };")
+_cfg = re.sub(r'export const FIREBASE_CONFIG = [\s\S]*?;\n', 'export const FIREBASE_CONFIG = @@;\n', open(os.path.join(ROOT, 'js/config.js')).read())
+CONFIG = _cfg.replace('@@', "{ apiKey: 'test', projectId: 'test' }")   # nube simulada
+NOCLOUD = _cfg.replace('@@', 'null')                                   # sin cuentas
 
 async def new_page(browser, base, video=None, cloud=False):
     args = {'viewport': {'width': 390, 'height': 844}, 'is_mobile': True, 'has_touch': True, 'service_workers': 'block'}
@@ -101,8 +102,9 @@ async def new_page(browser, base, video=None, cloud=False):
     await pg.route('https://covers.openlibrary.org/**', lambda r: asyncio.ensure_future(r.fulfill(status=404, body='')))
     await pg.route('https://www.panini.es/**', lambda r: asyncio.ensure_future(r.fulfill(status=200, content_type='image/jpeg', body=JPEG)))
     await pg.route('https://fonts.googleapis.com/**', lambda r: asyncio.ensure_future(r.fulfill(status=200, content_type='text/css', body='')))
+    body = CONFIG if cloud else NOCLOUD
+    await pg.route('**/js/config.js', lambda r: asyncio.ensure_future(r.fulfill(status=200, content_type='text/javascript', body=body)))
     if cloud:
-        await pg.route('**/js/config.js', lambda r: asyncio.ensure_future(r.fulfill(status=200, content_type='text/javascript', body=CONFIG)))
         async def fake(route):
             name = route.request.url.split('/')[-1]
             await route.fulfill(status=200, content_type='text/javascript', headers={'access-control-allow-origin': '*'},

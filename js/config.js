@@ -9,4 +9,11 @@ export const MINISTRY_URL = '';
 // Se copia de la consola de Firebase (Configuración del proyecto → Tus apps → Web).
 // No es secreta: lo que protege los datos son las reglas de Firestore (ver README).
 // null = cuentas desactivadas.
-export const FIREBASE_CONFIG = null;
+export const FIREBASE_CONFIG = {
+  apiKey: 'AIzaSyC9BLFp1_MEy5BXcA0-dGNlmZk45Q3anMA',
+  authDomain: 'shiori-9beb6.firebaseapp.com',
+  projectId: 'shiori-9beb6',
+  storageBucket: 'shiori-9beb6.firebasestorage.app',
+  messagingSenderId: '477177297918',
+  appId: '1:477177297918:web:b9a939bc6c0b956a9adeaf',
+};
