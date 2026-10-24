@@ -4,6 +4,7 @@ import { $, esc, euro, fmtDate, coverHTML, toast, openDialog, closeTopLayer, clo
 import { state, byId, byIsbn, saveComic, removeComic, setRead, saveSeriesMeta, setSetting } from './store.js';
 import { lookupCode, normalizeIsbn, parseTitle, normalizePublisher, guessType } from './lookup.js';
 import { uid } from './db.js';
+import { catalogSeriesFor } from './catalog.js';
 
 const hooks = { openSeries: null, openFind: null };
 export const setComicHooks = (h) => Object.assign(hooks, h);
@@ -43,7 +44,7 @@ function renderDetail() {
       <div class="detail-cover">${coverHTML(c, { lazy: false })}</div>
       <div class="detail-head">
         <h3>${esc(c.title)}</h3>
-        ${c.series ? `<button class="link" id="detail-series">${esc(c.series)}${c.number != null ? `, nº ${esc(c.number)}` : ''}</button>` : ''}
+        ${c.series ? `<button class="link" id="detail-series">${esc(c.series)}${c.number != null && !catalogSeriesFor(c.series)?.unnumbered ? `, nº ${esc(c.number)}` : ''}</button>` : ''}
         <button class="read-toggle${read ? ' is-read' : ''}" id="detail-read" aria-pressed="${read}">
           <span class="stamp" lang="ja" aria-hidden="true">済</span><span>${read ? `Leído${c.readAt ? ` el ${esc(fmtDate(c.readAt))}` : ''}` : 'Marcar como leído'}</span>
         </button>

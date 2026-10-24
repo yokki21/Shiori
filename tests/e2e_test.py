@@ -203,6 +203,16 @@ async def main():
         # Tomo por ISBN con serie y número
         await pg.evaluate("shiori.handleCode('9788411503358')"); await pg.wait_for_timeout(400)
         check(await pg.evaluate("shiori.state.comics.some(c => c.isbn === '9788411503358' && c.series && c.number)"), 'tomo de Panini por ISBN, con serie y número')
+        # Colección sin número impreso: el tomo entra en la serie «Marvel Must-Have» con su título
+        await pg.evaluate("shiori.handleCode('9788413342610')"); await pg.wait_for_timeout(400)
+        mh = await pg.evaluate("JSON.stringify(shiori.state.comics.filter(c => c.series === 'Marvel Must-Have').map(c => [c.title, c.number]))")
+        check('Desunidos' in mh, f'Marvel Must-Have como serie: {mh}')
+        await pg.click('.tab[data-view=series]'); await pg.wait_for_timeout(300)
+        await pg.click('.series-card:has-text("Marvel Must-Have")'); await pg.wait_for_selector('#sheet-series[open]')
+        own = await pg.inner_text('#series-body .vol.own .vol-n')
+        check('Desunidos' in own and 'Te faltan' in await pg.inner_text('#series-body'), f'la colección muestra títulos en vez de números: {own!r}')
+        await pg.keyboard.press('Escape'); await pg.wait_for_timeout(300)
+        await pg.click('.tab[data-view=library]'); await pg.wait_for_timeout(200)
         await pg.click('#btn-add'); await pg.fill('#add-input', 'lobezno 3'); await pg.press('#add-input', 'Enter'); await pg.wait_for_timeout(500)
         first = await pg.inner_text('#add-results .row >> nth=0 >> b')
         check(first == 'Lobezno 3', f'buscar por título en el catálogo: {first!r}')

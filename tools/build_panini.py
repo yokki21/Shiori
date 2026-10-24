@@ -264,6 +264,25 @@ def tomo_parse(p):
 
 extras = []
 isbn_of = lambda p: p['code'] if p['code'] and p['code'][:3] in ('978', '979') else None
+
+# Colecciones de tomos sin número impreso: cada título es una entrega de la colección, en orden de salida
+LINES = {'smust': 'Marvel Must-Have', 'smusd': 'DC Must-Have', 'sesse': 'Marvel Essentials'}
+for prefix, line in LINES.items():
+    # Cada título es una entrega; las reediciones (smust012x, smust012y…) cuentan como la misma
+    entries = {}
+    for p in sorted((p for p in products if p['prefix'] == prefix and id(p) not in used), key=lambda p: (p['skunum'] or 0, p['sku'])):
+        if re.match(r'pack\b', p['title'], re.I):
+            continue
+        k = ' '.join(w for w in key(VARIANT.sub('', p['title'])).split() if w not in {'el', 'la', 'los', 'las', 'al', 'del', 'de', 'y'})
+        entries.setdefault(k, []).append(p)   # «Masacre mata al/el Universo Marvel» es el mismo tomo
+    s = get_series(line, 'line|' + prefix)
+    s['names'][line] += 1
+    s['unnumbered'] = True
+    for n, ps in enumerate(entries.values(), 1):
+        for p in ps:
+            put_issue(s, n, p, isbn_of(p))
+            used.add(id(p))
+
 loose = defaultdict(list)   # grapas antiguas sin código, por referencia y nombre
 for p in sorted(products, key=lambda p: 0 if isbn_of(p) else 1):   # primero los que tienen ISBN
     if id(p) in used:
@@ -326,6 +345,8 @@ for s in series.values():
     o = {'name': s['name'], 'publisher': 'Panini', 'type': 'americano', 'line': 'DC' if s['cats'].most_common(1)[0][0] == 'dc' else 'Marvel'}
     if s['issn']:
         o['issn'], o['ean'] = s['issn'], s['ean']
+    if s.get('unnumbered'):
+        o['unnumbered'] = True   # colección sin número impreso: se muestra el título de cada tomo
     o['issues'] = {}
     for n, it in sorted(s['issues'].items()):
         isbn = it['isbn'] if it['isbn'] not in isbn_used else None

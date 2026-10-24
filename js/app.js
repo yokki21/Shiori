@@ -1,9 +1,9 @@
 // Arranque y navegación de Shiori.
 
-import { $, $$, setupDialogs, toast, plural } from './util.js';
-import { state, loadStore, onChange, startCloud } from './store.js';
+import { $, $$, setupDialogs, toast, plural, seriesKey } from './util.js';
+import { state, loadStore, onChange, startCloud, saveComic } from './store.js';
 import { setGoogleKey } from './lookup.js';
-import { loadCatalog } from './catalog.js';
+import { loadCatalog, catalogByIsbn } from './catalog.js';
 import { refreshDetail, setComicHooks } from './comic.js';
 import { openScanner, openAdd, handleCode } from './scan.js';
 import { renderLibrary, setupLibrary } from './views/library.js';
@@ -44,6 +44,17 @@ function render() {
   });
 }
 
+// Cómics guardados antes de que el catálogo los conociera: se completa la serie y el número que falten
+async function fillFromCatalog() {
+  for (const c of [...state.comics]) {
+    if (!c.isbn || (c.series && c.number != null)) continue;
+    const it = catalogByIsbn(c.isbn);
+    if (!it?.series || it.number == null) continue;
+    if (c.series && seriesKey(c.series) !== seriesKey(it.series)) continue;
+    await saveComic({ ...c, series: it.series, number: it.number });
+  }
+}
+
 async function init() {
   setupDialogs();
   try {
@@ -63,7 +74,7 @@ async function init() {
   $('#btn-add').addEventListener('click', () => openAdd({ focus: true }));
   document.addEventListener('click', (e) => { if (e.target.closest('[data-action="scan"]')) openScanner(); });
 
-  loadCatalog().then(render);
+  loadCatalog().then(fillFromCatalog).then(render);
   startCloud({
     onUser: () => { renderAccount(); render(); },
     onStatus: () => { renderAccount(); if (current === 'profile') render(); },

@@ -305,8 +305,9 @@ select {
 .series-stats b { font: 700 19px/1.15 var(--mincho); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .series-stats span { font-size: 12px; color: var(--sumi-2); }
 .vols { display: grid; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 18px 12px; margin: 16px 0; }
-.vol { position: relative; display: block; padding: 0; border: 0; background: none; color: var(--sumi); }
+.vol { position: relative; display: flex; flex-direction: column; justify-content: flex-start; align-self: start; padding: 0; border: 0; background: none; color: var(--sumi); text-align: center; }
 .vol-n { display: block; margin-top: 6px; font: 700 14px/1 var(--mincho); text-align: center; }
+.vol-n.t { font: 500 12px/1.3 var(--gothic); text-align: left; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .vol.miss .cover { opacity: .4; filter: grayscale(1); box-shadow: none; outline: 1px dashed var(--sumi-3); outline-offset: -1px; }
 .vol.miss .vol-n { color: var(--sumi-3); }
 .vol-price { position: absolute; top: 6px; right: 4px; z-index: 3; padding: 2px 6px; background: var(--kami); color: var(--sumi); font: 700 11px/1.3 var(--mincho); box-shadow: var(--lift); }

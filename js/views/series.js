@@ -53,14 +53,22 @@ export function renderSeriesSheet() {
   const g = findSeries(openKey);
   if (!g) { $('#series-body').innerHTML = '<p class="muted">Esta serie ya no tiene cómics.</p>'; return; }
   $('#series-heading').textContent = g.name;
+  // Colecciones sin número impreso (Must-Have, Essentials): cada tomo se nombra por su título
+  const loose = !!g.cat?.unnumbered;
+  const label = (n, c) => {
+    if (!loose) return n;
+    let t = c?.title || (g.cat ? catalogIssue(g.cat, n)?.title : '') || '';
+    if (t.toLowerCase().startsWith(g.name.toLowerCase())) t = t.slice(g.name.length).replace(/^[.:]?\s*/, '');
+    return esc(t || n);
+  };
   const cells = [];
   for (let n = 1; n <= g.max; n++) {
     const c = g.byNum.get(n);
     if (c) {
-      cells.push(`<button class="vol own${c.reading === 'leido' ? ' read' : ''}" data-id="${esc(c.id)}" aria-label="Nº ${n}, lo tienes${c.reading === 'leido' ? ', leído' : ''}">${coverHTML(c)}<span class="vol-n">${n}</span>${c.reading === 'leido' ? '<span class="mark-read" title="Leído" lang="ja">済</span>' : ''}</button>`);
+      cells.push(`<button class="vol own${c.reading === 'leido' ? ' read' : ''}" data-id="${esc(c.id)}" aria-label="${loose ? label(n, c) : `Nº ${n}`}, lo tienes${c.reading === 'leido' ? ', leído' : ''}">${coverHTML(c)}<span class="vol-n${loose ? ' t' : ''}">${label(n, c)}</span>${c.reading === 'leido' ? '<span class="mark-read" title="Leído" lang="ja">済</span>' : ''}</button>`);
     } else {
       const it = g.cat ? catalogIssue(g.cat, n) : null;
-      cells.push(`<button class="vol miss" data-n="${n}" aria-label="Nº ${n}, te falta">${coverHTML(it || { series: g.name, number: n })}<span class="vol-n">${n}</span>${it?.price != null ? `<span class="vol-price">${euro(it.price)}</span>` : ''}</button>`);
+      cells.push(`<button class="vol miss" data-n="${n}" aria-label="${loose ? label(n) : `Nº ${n}`}, te falta">${coverHTML(it || { series: g.name, number: n })}<span class="vol-n${loose ? ' t' : ''}">${label(n)}</span>${it?.price != null ? `<span class="vol-price">${euro(it.price)}</span>` : ''}</button>`);
     }
   }
   const meta = state.seriesMeta.get(g.key) || {};
@@ -69,9 +77,9 @@ export function renderSeriesSheet() {
       <div><b>${g.owned}${g.knownTotal || g.missing.length ? `/${g.max}` : ''}</b><span>tienes</span></div>
       <div><b>${g.read}</b><span>leídos</span></div>
       <div><b>${g.missing.length}</b><span>te faltan</span></div>
-      <div><b>${g.missingCost != null && g.missing.length ? `${g.costEstimated ? '≈' : ''}${euro(g.missingCost)}` : '—'}</b><span>completarla</span></div>
+      <div><b>${g.missingCost != null && g.missing.length ? `${g.costEstimated ? '≈' : ''}${g.missingCost >= 1000 ? `${Math.round(g.missingCost).toLocaleString('es-ES')} €` : euro(g.missingCost)}` : '—'}</b><span>completarla</span></div>
     </div>
-    ${g.missing.length ? `<p class="muted small">Te faltan los números ${ranges(g.missing)}.${g.costEstimated ? ' El precio es aproximado: donde no conozco el precio uso la media de lo que has pagado.' : ''} Toca uno que tengas para añadirlo.</p>` : ''}
+    ${g.missing.length ? `<p class="muted small">${loose ? `Te faltan ${plural(g.missing.length, 'tomo', 'tomos')} de la colección.` : `Te faltan los números ${ranges(g.missing)}.`}${g.costEstimated ? ' El precio es aproximado: donde no conozco el precio uso la media de lo que has pagado.' : ''} Toca uno que tengas para añadirlo.</p>` : ''}
     ${!g.knownTotal && !g.cat ? '<p class="muted small">No sé cuántos números tiene esta serie: indícalo abajo para ver también los que faltan al final.</p>' : ''}
     <div class="vols">${cells.join('')}</div>
     <p class="muted small">Has gastado ${euro(g.spent)} en esta serie${g.publisher ? ` de ${esc(g.publisher)}` : ''}.</p>
