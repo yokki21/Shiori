@@ -24,7 +24,7 @@ def ean_ok(code):
 
 
 def iso(d):
-    m = re.match(r'^(\d{1,2}) de? ?([a-z]+) (?:de )?(\d{4})$', (d or '').strip().lower())
+    m = re.match(r'^(\d{1,2}) (?:de )?([a-z]+) (?:de )?(\d{4})$', (d or '').strip().lower())
     return f'{m.group(3)}-{MONTHS[m.group(2)]:02d}-{int(m.group(1)):02d}' if m and m.group(2) in MONTHS else ''
 
 
@@ -87,8 +87,10 @@ def build(key, isbn_used, taken_names):
     for s in series:
         by_base[key(s['base'])].append(s)
     for g in by_base.values():
+        # se queda el nombre corto la que se llama así en la ficha o, si ninguna, la más larga
+        main = next((s for s in g if key(s['gk']) == key(s['base'])), None) or max(g, key=lambda s: len(s['items']))
         for s in g:
-            s['name'] = s['base'] if len(g) == 1 or key(s['gk']) == key(s['base']) else s['gk']
+            s['name'] = s['base'] if s is main else s['gk']
     names = Counter(key(s['name']) for s in series)
     for s in series:
         if names[key(s['name'])] > 1 or key(s['name']) in taken_names:
