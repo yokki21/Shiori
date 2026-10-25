@@ -52,6 +52,13 @@ def assemble(records, PUBLISHER, key, isbn_used, taken_names):
         if names[key(s['name'])] > 1 or key(s['name']) in taken_names:
             y = min((p['date'] for p in s['items'].values() if p['date']), default='')[:4]
             s['name'] = f"{s['name']} ({PUBLISHER}{', ' + y if y else ''})"
+    # Si aún coinciden dos nombres (misma serie y año), se numeran
+    seen = Counter()
+    for s in series:
+        k = key(s['name'])
+        seen[k] += 1
+        if seen[k] > 1:
+            s['name'] = f"{s['name']} ({seen[k]})"
     out_series = []
     for s in sorted(series, key=lambda s: key(s['name'])):
         taken_names.add(key(s['name']))

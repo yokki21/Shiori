@@ -54,8 +54,12 @@ def ean_ok(code):
     return (10 - s % 10) % 10 == int(code[12])
 
 
-SMALL = {'de', 'del', 'la', 'las', 'el', 'los', 'y', 'e', 'en', 'a', 'al', 'o', 'u', 'por', 'con', 'para', 'sin', 'un', 'una', 'vs', 'vs.'}
+SMALL = {'of', 'de', 'del', 'la', 'las', 'el', 'los', 'y', 'e', 'en', 'a', 'al', 'o', 'u', 'por', 'con', 'para', 'sin', 'un', 'una', 'vs', 'vs.'}
 KEEP_UP = {'X', 'DC', 'HC', 'TPB', 'II', 'III', 'IV', 'VI', 'VII', 'VIII', 'IX', 'XI', 'XII', 'SHIELD', 'S.H.I.E.L.D.', 'AIM', 'HYDRA', 'USA', 'IA', 'JLA', 'JSA', 'MCU', 'G.I.', 'GI', 'ROM'}
+
+
+ROMAN = re.compile(r'(?=[MDCLXVI]{2})M{0,3}(?:CM|CD|D?C{0,3})(?:XC|XL|L?X{0,3})(?:IX|IV|V?I{0,3})')
+NOT_ROMAN = {'MIX', 'DIM', 'MIL', 'LID', 'DID', 'VID', 'MID', 'DIL', 'CID', 'LIDL'}
 
 
 def nice(s):
@@ -70,7 +74,7 @@ def nice(s):
         parts = []
         for p in re.split(r'(-)', w):
             core = re.sub(r'[^\w.]', '', p)
-            if core.upper() in KEEP_UP or re.fullmatch(r'(?:[A-ZÁÉÍÓÚÑ]\.)+[A-ZÁÉÍÓÚÑ]\.?', core):
+            if core.upper() in KEEP_UP or re.fullmatch(r'(?:[A-ZÁÉÍÓÚÑ]\.)+[A-ZÁÉÍÓÚÑ]\.?', core) or ROMAN.fullmatch(core) and core not in NOT_ROMAN:
                 parts.append(p)
             elif i > 0 and p.lower() in SMALL:
                 parts.append(p.lower())
@@ -78,7 +82,8 @@ def nice(s):
                 parts.append(p[:1].upper() + p[1:].lower() if p else p)
         out.append(''.join(parts))
     s = ' '.join(out)
-    return re.sub(r'(?<=[.:¡¿] )([a-záéíóúñ])', lambda m: m.group(1).upper(), s)
+    s = re.sub(r'(?<=[.:¡¿] )([a-záéíóúñ])', lambda m: m.group(1).upper(), s)
+    return re.sub(r'(?<=\()([a-záéíóúñ])', lambda m: m.group(1).upper(), s)
 
 
 def clean(s):

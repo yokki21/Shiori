@@ -277,6 +277,15 @@ async def main():
           document.body.append(d); await new Promise(r => setTimeout(r, 800)); const i = d.querySelector('img'); const out = i ? i.src : 'sin img'; d.remove(); return out; })()""")
         check('/original/a.jpg' in fb, f'una portada mediana que falla se cambia por la original: {fb}')
 
+        print('Catálogo de Norma')
+        await pg.evaluate("shiori.handleCode('9788467985078')"); await pg.wait_for_timeout(400)
+        cm = await pg.evaluate("JSON.stringify(shiori.state.comics.filter(c => c.isbn === '9788467985078').map(c => [c.series, c.number, c.publisher, (c.cover || '').slice(0, 40)]))")
+        check('"Chainsaw Man",23,"Norma Editorial","https://www.normaeditorial.com/upload' in cm, f'tomo de Norma por ISBN, con serie, número y portada: {cm}')
+        await pg.click('.tab[data-view=new]'); await pg.click('#new-pubs [data-pub="Norma Editorial"]'); await pg.wait_for_timeout(300)
+        rows = await pg.evaluate("[...document.querySelectorAll('#new-list .rel .row-main span')].map(e => e.textContent)")
+        check(all('Norma Editorial' in r for r in rows), f'filtro Norma en novedades: {len(rows)}')
+        await pg.click('#new-pubs [data-pub=""]')
+
         print('Catálogo de Panini')
         # El suplemento numera la colección ISSN: el 00021 de 2938-5199 es «Capitán América 4»
         await pg.evaluate("shiori.handleCode('9772938519008', {addon: '00021'})"); await pg.wait_for_timeout(400)
