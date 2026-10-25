@@ -287,6 +287,9 @@ async def main():
         await pg.click('#new-pubs [data-pub=""]')
 
         print('Catálogo de Ivrea')
+        await pg.evaluate("shiori.handleCode('9788418172052')"); await pg.wait_for_timeout(400)
+        gs = await pg.evaluate("JSON.stringify(shiori.state.comics.filter(c => c.isbn === '9788418172052').map(c => [c.series, c.number, c.publisher, c.price]))")
+        check(gs == '[["Goblin Slayer",3,"Ivrea",8.5]]', f'tomo de Ivrea por ISBN (de La Comiquería), con serie, número y precio: {gs}')
         await pg.click('.tab[data-view=search]'); await pg.fill('#search-input', 'goblin slayer'); await pg.wait_for_timeout(800)
         txt = await pg.inner_text('#search-results')
         check('Ivrea' in txt, f'las series de Ivrea salen en la búsqueda: {txt[:120]!r}')
