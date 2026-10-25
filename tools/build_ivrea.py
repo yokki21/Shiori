@@ -73,27 +73,52 @@ def build(key, nice, isbn_used, taken_names):
             io['cover'] = short(c['img'])
         s['issues'] = dict(sorted(s['issues'].items(), key=lambda kv: int(kv[0])))
 
-    # ISBN y precio de cada tomo, de las fichas de La Comiquería (la tienda online de Ivrea): «GOBLIN SLAYER 03»
+    # ISBN y precio de cada tomo, de las fichas de La Comiquería (la tienda online de Ivrea): «GOBLIN SLAYER 03».
+    # Si la tienda tiene un tomo que la galería aún no muestra, se añade; si la serie no aparece en la web de Ivrea
+    # con ese nombre («JOJO'S BIZARRE ADVENTURE PARTE 3: STARDUST CRUSADERS»), se crea con lo que da la tienda.
+    def find(k):
+        s = by_key.get(k)
+        if s is None:
+            words = set(k.split())
+            def ok(kk):
+                kw = set(kk.split())
+                if words <= kw:
+                    return True   # «HEARTBEATS» → «Heartbeats: ¡Al límite de la taquicardia!»
+                extra = words - kw   # la tienda añade un subtítulo, salvo que sea otra parte o edición
+                return len(kw) > 1 and kw <= words and not extra & {'parte', 'stage', '2nd', 'ragnarok', 'deluxe', 'edicion', 'ii', 'iii', 'gaiden', 'kanzenban'} and not any(w.isdigit() for w in extra)
+            cands = [(len(kk), v) for kk, v in by_key.items() if len(words) > 1 and ok(kk)]
+            s = min(cands, key=lambda x: x[0])[1] if cands else None
+        return s
+
     shop = os.path.join(HERE, 'ivrea_isbn.json')
     if os.path.exists(shop):
-        for path, r in json.load(open(shop)).items():
-            t = html.unescape(r.get('t') or '').strip()
+        for path, r in sorted(json.load(open(shop)).items()):
+            t = re.sub(r'\s+', ' ', html.unescape(r.get('t') or '')).strip()
             isbn = r.get('isbn') if ean_ok(r.get('isbn')) else None
-            if not t or isbn in isbn_used:
-                continue
+            if not t or not isbn or isbn in isbn_used or re.search(r'novela|\+', t, re.I):
+                continue   # sin código, repetido, novelas y packs de dos tomos
             m = re.match(r'^(.*?\S)\s+(?:N[º°]\s*)?0*(\d{1,3})$', t, re.I)
-            k = key(m.group(1)) if m else key(t)
-            s = by_key.get(k)
-            if s is None:
-                continue
-            io = s['issues'].get(m.group(2).lstrip('0') or '0') if m and 'issues' in s else (s if 'issues' not in s and not m else None)
-            if io is None:
-                continue
-            if isbn and not io.get('isbn'):
+            base = m.group(1) if m else t
+            s = find(key(base))
+            if m:
+                if s is None or 'issues' not in s:
+                    s = {'name': nice(base), 'publisher': PUBLISHER, 'type': 'manga', 'line': 'Manga', 'issues': {}}
+                    series.append(s)
+                    by_key[key(base)] = s
+                io = s['issues'].setdefault(str(int(m.group(2))), {})
+                s['issues'] = dict(sorted(s['issues'].items(), key=lambda kv: int(kv[0])))
+            elif s is not None and 'issues' not in s:
+                io = s
+            else:
+                io = {'title': nice(t), 'publisher': PUBLISHER, 'line': 'Manga', 'type': 'manga'}
+                extras.append(io)
+                by_key[key(t)] = io
+            if not io.get('isbn'):
                 io['isbn'] = isbn
                 isbn_used.add(isbn)
             if r.get('p') and not io.get('price'):
                 io['price'] = r['p']
+    series = [s for s in series if s['issues']]
 
     # Nombres que ya usa otra editorial: se distinguen
     for s in series:
