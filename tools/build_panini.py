@@ -452,17 +452,19 @@ for p in issn_extras:   # grapas con código y sin número en el título (especi
 import build_planeta
 used = {i['isbn'] for s in out_series for i in s['issues'].values() if 'isbn' in i} | {e['isbn'] for e in out_extras if 'isbn' in e}
 names = {key(s['name']) for s in out_series}
+import build_norma
 pl_series, pl_extras = build_planeta.build(key, used, names)
-out_series = sorted(out_series + pl_series, key=lambda s: key(s['name']))
-out_extras += pl_extras
+nm_series, nm_extras = build_norma.build(key, nice, used, names)
+out_series = sorted(out_series + pl_series + nm_series, key=lambda s: key(s['name']))
+out_extras += pl_extras + nm_extras
 
 out = {
     'version': 2,
     'updated': __import__('datetime').date.today().isoformat(),
-    'source': 'Catálogos de Panini España (panini.es) y Planeta Cómic (planetadelibros.com)',
+    'source': 'Catálogos de Panini España (panini.es), Planeta Cómic (planetadelibros.com) y Norma Editorial (normaeditorial.com)',
     'img': 'https://www.panini.es/media/catalog/product/',
     'imgq': '?quality=80&fit=bounds&height=480&width=320',
-    'imgs': {'pl': build_planeta.IMG},   # portadas de otras editoriales: "pl:ruta"
+    'imgs': {'pl': build_planeta.IMG, 'nm': build_norma.IMG},   # portadas de otras editoriales: "pl:ruta"
     'series': out_series,
     'extras': out_extras,
 }

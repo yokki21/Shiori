@@ -1,4 +1,4 @@
-# Cada lunes busca novedades de cómics y manga en panini.es y planetadelibros.com, regenera el catálogo y lo publica.
+# Cada lunes busca novedades de cómics y manga en panini.es, planetadelibros.com y normaeditorial.com, regenera el catálogo y lo publica.
 name: Catálogo semanal
 on:
   schedule:
@@ -31,6 +31,9 @@ jobs:
       - name: Buscar novedades en Planeta Cómic
         continue-on-error: true
         run: python3 tools/update_planeta.py --max 300
+      - name: Buscar novedades en Norma Editorial
+        continue-on-error: true
+        run: python3 tools/update_norma.py --max 400
       - name: Regenerar el catálogo
         run: python3 tools/build_panini.py
       - name: Comprobar el catálogo
@@ -41,9 +44,9 @@ jobs:
         run: |
           git config user.name "yokki21"
           git config user.email "jmartinezserrano31@gmail.com"
-          git add catalog/catalog.json tools/panini_raw.json tools/panini_skip.json tools/planeta_raw.json
+          git add catalog/catalog.json tools/panini_raw.json tools/panini_skip.json tools/planeta_raw.json tools/norma_raw.json
           if git diff --cached --quiet; then echo "Sin cambios"; exit 0; fi
-          git commit -m "Catálogo: novedades de Panini y Planeta ($(date +%F))"
+          git commit -m "Catálogo: novedades de Panini, Planeta y Norma ($(date +%F))"
           git push
           # Los envíos hechos desde una tarea no lanzan la publicación de Pages: se pide a mano
           gh api -X POST "repos/${{ github.repository }}/pages/builds" || echo "No se ha podido pedir la publicación"

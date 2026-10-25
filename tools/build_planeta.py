@@ -4,7 +4,8 @@
 # planetadelibros.com (t título, au autores, img portada, p precio, d "6 julio 2022", pg páginas,
 # serie y col de la ficha técnica, k "manga" o "comic" según el listado del que vino).
 import json, os, re
-from collections import Counter, defaultdict
+from collections import defaultdict
+from build_common import assemble, ean_ok
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 RAW = os.path.join(HERE, 'planeta_raw.json')
@@ -15,12 +16,6 @@ MONTHS = {m: i + 1 for i, m in enumerate(['enero', 'febrero', 'marzo', 'abril', 
 # "One Piece nº 100", "Bobobo nº 19/21", "Dragon Ball Color Saiyan nº 01/03", "Akira (Edición original) nº 03/06"
 NUM_RE = re.compile(r'^(.*?)\s*,?\s+(?:n[º°o]\.?|n\.|núm\.?|vol\.?|tomo)\s*(\d{1,4})(?:\s*/\s*\d{1,4})?\s*(.*)$', re.I)
 
-
-def ean_ok(code):
-    if not code or not re.fullmatch(r'\d{13}', code):
-        return False
-    s = sum(int(c) * (3 if i % 2 else 1) for i, c in enumerate(code[:12]))
-    return (10 - s % 10) % 10 == int(code[12])
 
 
 def iso(d):
@@ -68,69 +63,13 @@ def build(key, isbn_used, taken_names):
         else:
             loose.append(p)
 
-    series = []
+    recs = []
+    for p in loose:
+        recs.append(p)
     for gk, items in groups.items():
-        by_n = {}
-        for p in sorted(items, key=lambda p: (p['date'] or '9999', p['isbn'] is None)):
-            if p['n'] in by_n:
-                loose.append(p)   # otra edición del mismo número (reedición, catalán…)
-            else:
-                by_n[p['n']] = p
-        if len(by_n) == 1 and not by_n.get(1):
-            loose.extend(by_n.values())
-            continue
-        base = Counter(p['base'] for p in by_n.values()).most_common(1)[0][0]
-        series.append({'gk': gk, 'base': base, 'items': by_n})
-
-    # Nombre visible: el del título ("One Piece"); si dos series lo comparten, el de la ficha ("Detective Conan II")
-    by_base = defaultdict(list)
-    for s in series:
-        by_base[key(s['base'])].append(s)
-    for g in by_base.values():
-        # se queda el nombre corto la que se llama así en la ficha o, si ninguna, la más larga
-        main = next((s for s in g if key(s['gk']) == key(s['base'])), None) or max(g, key=lambda s: len(s['items']))
-        for s in g:
-            s['name'] = s['base'] if s is main else s['gk']
-    names = Counter(key(s['name']) for s in series)
-    for s in series:
-        if names[key(s['name'])] > 1 or key(s['name']) in taken_names:
-            y = min((p['date'] for p in s['items'].values() if p['date']), default='')[:4]
-            s['name'] = f"{s['name']} ({PUBLISHER}{', ' + y if y else ''})"
-    out_series = []
-    for s in sorted(series, key=lambda s: key(s['name'])):
-        taken_names.add(key(s['name']))
-        manga = sum(p['manga'] for p in s['items'].values()) * 2 >= len(s['items'])
-        o = {'name': s['name'], 'publisher': PUBLISHER, 'type': 'manga' if manga else 'americano',
-             'line': 'Manga' if manga else 'Otros', 'issues': {}}
-        for n, p in sorted(s['items'].items()):
-            io = {}
-            if p['title'] != f"{s['name']} {n}":
-                io['title'] = p['title']
-            for k in ('cover', 'price', 'date'):
-                if p[k]:
-                    io[k] = p[k]
-            if p['isbn'] and p['isbn'] not in isbn_used:
-                io['isbn'] = p['isbn']
-                isbn_used.add(p['isbn'])
-            for k in ('pages', 'authors'):
-                if p[k]:
-                    io[k] = p[k]
-            o['issues'][str(n)] = io
-        out_series.append(o)
-
-    out_extras = []
-    for p in sorted(loose, key=lambda p: key(p['title'])):
-        if p['isbn'] and p['isbn'] in isbn_used:
-            continue
-        if re.search(r'\(novela\)|^agenda |calendario 20\d\d', p['title'], re.I):
-            continue   # novelas, agendas y calendarios que se cuelan en los listados de cómic
-        o = {'title': p['title'], 'publisher': PUBLISHER}
-        for k in ('cover', 'price', 'date', 'isbn', 'pages', 'authors'):
-            if p[k]:
-                o[k] = p[k]
-        if p['isbn']:
-            isbn_used.add(p['isbn'])
-        o['line'] = 'Manga' if p['manga'] else 'Otros'
-        o['type'] = 'manga' if p['manga'] else 'americano'
-        out_extras.append(o)
-    return out_series, out_extras
+        for p in items:
+            p['gk'] = gk
+            recs.append(p)
+    for p in recs:
+        p['line'], p['type'] = ('Manga', 'manga') if p.pop('manga') else ('Otros', 'americano')
+    return assemble(recs, PUBLISHER, key, isbn_used, taken_names)
