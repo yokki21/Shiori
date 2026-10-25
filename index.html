@@ -47,6 +47,7 @@
       </div>
       <div class="top-actions">
         <button class="add-btn" id="btn-add" aria-label="Añadir un cómic"><svg aria-hidden="true"><use href="#i-plus"/></svg></button>
+        <button class="add-btn profile-btn" id="btn-profile" data-view="profile" aria-label="Perfil y ajustes"><svg aria-hidden="true"><use href="#i-user"/></svg></button>
         <span class="tanafuda" id="screen-tag" lang="ja" aria-hidden="true">本棚</span>
       </div>
     </header>
@@ -103,6 +104,14 @@
         <div id="new-list"></div>
       </section>
 
+      <section class="view" id="view-search" hidden>
+        <form class="search" id="search-form" role="search">
+          <svg aria-hidden="true"><use href="#i-search"/></svg>
+          <input type="search" id="search-input" placeholder="Título, serie o ISBN" autocomplete="off" enterkeyhint="search" aria-label="Buscar cómics en el catálogo">
+        </form>
+        <div id="search-results"></div>
+      </section>
+
       <section class="view" id="view-wish" hidden>
         <form class="search wish-search" id="wish-form" role="search">
           <svg aria-hidden="true"><use href="#i-search"/></svg>
@@ -154,10 +163,10 @@
 
     <nav class="tabbar" aria-label="Secciones">
       <button class="tab on" data-view="library" aria-current="page"><svg aria-hidden="true"><use href="#i-shelf"/></svg><span>Biblioteca</span></button>
-      <button class="tab" data-view="new"><svg aria-hidden="true"><use href="#i-calendar"/></svg><span>Novedades</span></button>
+      <button class="tab" data-view="search"><svg aria-hidden="true"><use href="#i-search"/></svg><span>Buscar</span></button>
       <button class="hanko" id="btn-scan" aria-label="Escanear código de barras"><span class="seal" lang="ja" aria-hidden="true">読</span><span class="lbl">Escanear</span></button>
+      <button class="tab" data-view="new"><svg aria-hidden="true"><use href="#i-calendar"/></svg><span>Novedades</span></button>
       <button class="tab" data-view="wish"><svg aria-hidden="true"><use href="#i-ribbon"/></svg><span>Deseados</span></button>
-      <button class="tab" data-view="profile"><svg aria-hidden="true"><use href="#i-user"/></svg><span>Perfil</span></button>
     </nav>
   </div>
 

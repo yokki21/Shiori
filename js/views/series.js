@@ -1,11 +1,10 @@
 // Series: las que tienes, qué números, cuántos faltan y cuánto costaría completarlas.
 
-import { $, esc, euro, plural, ranges, seriesKey, coverHTML, toast, openDialog, confirmSheet, parseIntOrNull } from '../util.js';
-import { addWish } from './wish.js';
-import { byId, removeComic, saveSeriesMeta, state, wanted } from '../store.js';
+import { $, esc, euro, plural, ranges, seriesKey, coverHTML, toast, openDialog, parseIntOrNull } from '../util.js';
+import { byId, saveSeriesMeta, state, wanted } from '../store.js';
 import { seriesList, findSeries, missingIssueData } from '../series.js';
 import { catalogIssue } from '../catalog.js';
-import { openDetail, newDraft, commitDraft } from '../comic.js';
+import { openDetail, openPreview } from '../comic.js';
 
 const costText = (g) => {
   if (g.complete) return 'Completa';
@@ -84,7 +83,7 @@ export function renderSeriesSheet() {
       <div><b>${g.missing.length}</b><span>te faltan</span></div>
       <div><b>${g.missingCost != null && g.missing.length ? `${g.costEstimated ? '≈' : ''}${g.missingCost >= 1000 ? `${Math.round(g.missingCost).toLocaleString('es-ES')} €` : euro(g.missingCost)}` : '—'}</b><span>completarla</span></div>
     </div>
-    ${g.missing.length ? `<p class="muted small">${loose ? `Te faltan ${plural(g.missing.length, 'tomo', 'tomos')} de la colección.` : `Te faltan los números ${ranges(g.missing)}.`}${g.costEstimated ? ' El precio es aproximado: donde no conozco el precio uso la media de lo que has pagado.' : ''} Toca uno que tengas para añadirlo.</p>` : ''}
+    ${g.missing.length ? `<p class="muted small">${loose ? `Te faltan ${plural(g.missing.length, 'tomo', 'tomos')} de la colección.` : `Te faltan los números ${ranges(g.missing)}.`}${g.costEstimated ? ' El precio es aproximado: donde no conozco el precio uso la media de lo que has pagado.' : ''} Toca uno para ver su ficha y añadirlo o apuntarlo en deseados.</p>` : ''}
     ${!g.knownTotal && !g.cat ? '<p class="muted small">No sé cuántos números tiene esta serie: indícalo abajo para ver también los que faltan al final.</p>' : ''}
     <div class="vols">${cells.join('')}</div>
     <p class="muted small">Has gastado ${euro(g.spent)} en esta serie${g.publisher ? ` de ${esc(g.publisher)}` : ''}.</p>
@@ -104,25 +103,7 @@ $('#series-body').addEventListener('click', async (e) => {
   const own = e.target.closest('.vol.own');
   if (own) { openDetail(byId(own.dataset.id)); return; }
   const miss = e.target.closest('.vol.miss');
-  if (miss) {
-    const n = +miss.dataset.n;
-    const w = wanted().find((c) => seriesKey(c.series || '') === g.key && c.number === n);
-    const data = missingIssueData(g, n);
-    const ok = await confirmSheet({
-      title: data.title || `${g.name} ${n}`,
-      text: w ? 'Lo tienes en deseados. ¿Ya es tuyo?' : '¿Lo tienes? Se añadirá a tu biblioteca. Si aún no, puedes apuntarlo en deseados.',
-      ok: 'Lo tengo, añadir', alt: w ? '' : 'Lo quiero: a deseados',
-    });
-    if (!ok) return;
-    if (ok === 'alt') {
-      const d = await addWish(data);
-      toast(`Añadido a deseados: ${d.title}`, 'Deshacer', () => removeComic(d.id));
-      return;
-    }
-    const d = await commitDraft(newDraft(data));
-    toast(`Añadido: ${d.title}`, 'Deshacer', () => removeComic(d.id));
-    return;
-  }
+  if (miss) { openPreview(missingIssueData(g, +miss.dataset.n)); return; }   // su ficha: verla, desearla o añadirla
   if (e.target.id === 'series-save') {
     await saveSeriesMeta({ key: g.key, name: g.name, total: parseIntOrNull($('#series-total').value), finished: $('#series-finished').checked });
     toast('Serie actualizada');

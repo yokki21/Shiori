@@ -3,17 +3,11 @@
 // marcarlo como «Ya lo tengo», pasa a la biblioteca.
 
 import { $, esc, euro, plural, seriesKey, coverHTML, toast } from '../util.js';
-import { state, wanted, byId, byIsbn, saveComic, removeComic } from '../store.js';
+import { wanted, byId, saveComic, removeComic, findAny } from '../store.js';
 import { loadCatalog, searchCatalog, searchCatalogSeries, catalogSeriesItems } from '../catalog.js';
 import { openDetail, newDraft } from '../comic.js';
 
-// Cómic que ya está en Shiori (en la colección o en deseados) con el mismo ISBN o serie y número
-export function findAny(it) {
-  if (it.isbn && byIsbn(it.isbn)) return byIsbn(it.isbn);
-  const k = seriesKey(it.series || '');
-  if (!k || it.number == null) return null;
-  return state.comics.find((c) => c.number === it.number && seriesKey(c.series || '') === k) || null;
-}
+export { findAny };
 
 export async function addWish(it) {
   const d = newDraft(it);

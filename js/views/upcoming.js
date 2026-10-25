@@ -6,6 +6,7 @@ import { $, $$, esc, euro, plural, seriesKey, coverHTML, toast, MONTHS } from '.
 import { owned, wanted, removeComic } from '../store.js';
 import { loadCatalog, catalogUpcoming, catalogLoaded } from '../catalog.js';
 import { addWish, findAny } from './wish.js';
+import { openPreview } from '../comic.js';
 
 const DAYS = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
 let line = '';
@@ -51,7 +52,7 @@ export function renderUpcoming() {
     const why = u.rel === 'own' ? '<span class="row-state">Ya lo tienes</span>'
       : u.rel === 'wish' ? '<span class="row-state wished">Deseado</span>'
       : `<button class="row-add" data-i="${i}">Lo quiero</button>`;
-    return `<div class="rel${u.inSeries || u.rel ? ' mine' : ''}">
+    return `<div class="rel${u.inSeries || u.rel ? ' mine' : ''}" data-i="${i}" role="button" tabindex="0" aria-label="${esc(u.item.title)}: ver ficha">
       <span class="rel-date${sameDay ? ' same' : ''}" aria-label="${esc(`${wd} ${day} ${month}`)}">${sameDay ? '' : `<b>${day}</b><span>${esc(month)}</span><span>${esc(wd)}</span>`}</span>
       ${coverHTML(u.item)}
       <span class="row-main"><b>${esc(u.item.title)}</b><span>${esc([u.item.price != null ? euro(u.item.price) : '', u.item.publisher === 'Panini' ? u.line : u.item.publisher].filter(Boolean).join(', '))}</span></span>
@@ -76,9 +77,12 @@ export function setupUpcoming() {
       renderUpcoming();
     });
   }
+  // Tocar una novedad abre su ficha (la tuya si ya la tienes o deseas)
+  const open = (row) => { const u = shown[+row.dataset.i]; if (u) openPreview(u.item); };
+  $('#new-list').addEventListener('keydown', (e) => { const r = e.target.closest('.rel'); if (r && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); open(r); } });
   $('#new-list').addEventListener('click', async (e) => {
     const b = e.target.closest('.row-add');
-    if (!b) return;
+    if (!b) { const r = e.target.closest('.rel'); if (r) open(r); return; }
     const u = shown[+b.dataset.i];
     if (!u) return;
     const d = await addWish(u.item);

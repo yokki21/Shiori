@@ -1,7 +1,7 @@
 // Ficha de un cómic: vista con toda su información y el botón de leído, y formulario de edición.
 
 import { $, esc, euro, fmtDate, coverHTML, toast, openDialog, closeTopLayer, closeAllLayers, confirmSheet, parsePrice, parseIntOrNull, seriesKey, today } from './util.js';
-import { state, byId, byIsbn, saveComic, removeComic, setRead, saveSeriesMeta, setSetting, wishToOwned } from './store.js';
+import { state, byId, byIsbn, saveComic, removeComic, setRead, saveSeriesMeta, setSetting, wishToOwned, findAny } from './store.js';
 import { lookupCode, normalizeIsbn, parseTitle, normalizePublisher, guessType, fetchRatings, ratingLinks } from './lookup.js';
 import { uid } from './db.js';
 import { catalogSeriesFor } from './catalog.js';
@@ -11,14 +11,30 @@ export const setComicHooks = (h) => Object.assign(hooks, h);
 
 // ---------- Vista de la ficha ----------
 let shownId = null;
+let preview = null;   // cómic del catálogo que aún no está en Shiori (desde la búsqueda o novedades)
 
-export function openDetail(c) {
-  if (!c) return;
-  shownId = c.id;
+function showSheet() {
   renderDetail();
   const dlg = $('#sheet-detail');
   if (!dlg.open) openDialog(dlg);
   $('#sheet-detail .sheet-body').scrollTop = 0;
+}
+
+export function openDetail(c) {
+  if (!c) return;
+  shownId = c.id;
+  preview = null;
+  showSheet();
+}
+
+// Ficha de un cómic del catálogo: si ya lo tienes o lo deseas se abre el tuyo; si no, se puede apuntar
+export function openPreview(it) {
+  if (!it) return;
+  const mine = findAny(it);
+  if (mine) { openDetail(mine); return; }
+  shownId = null;
+  preview = it;
+  showSheet();
 }
 
 export function refreshDetail() {
@@ -28,7 +44,43 @@ export function refreshDetail() {
 const stars = (n) => [1, 2, 3, 4, 5].map((i) => `<button class="star${i <= (n || 0) ? ' on' : ''}" data-star="${i}" aria-label="${i} de 5" aria-pressed="${i <= (n || 0)}">★</button>`).join('');
 const fmtAvg = (x) => (Math.round(x * 10) / 10).toLocaleString('es-ES');
 
+function renderPreview(c) {
+  const future = c.publishedDate && c.publishedDate > today();
+  const facts = [
+    ['Editorial', esc(c.publisher)],
+    ['Precio', c.price != null ? esc(euro(c.price)) : ''],
+    [future ? 'Sale el' : 'Publicado', esc(fmtDate(c.publishedDate))],
+    ['Autores', esc(c.authors)],
+    ['Páginas', esc(c.pages)],
+    [c.issn ? 'ISSN' : 'ISBN', esc(c.issn || c.isbn)],
+  ].filter(([, v]) => v);
+  const unnumbered = c.series && catalogSeriesFor(c.series)?.unnumbered;
+  $('#detail-heading').textContent = future ? 'Próximamente' : (c.series || 'Cómic');
+  $('#detail-body').innerHTML = `
+    <div class="detail-top">
+      <div class="detail-cover">${coverHTML(c, { lazy: false })}</div>
+      <div class="detail-head">
+        <h3>${esc(c.title)}</h3>
+        ${c.series ? `<button class="link" id="detail-series">${esc(c.series)}${c.number != null && !unnumbered ? `, nº ${esc(c.number)}` : ''}</button>` : ''}
+        <p class="muted small">No está en tu colección.</p>
+        <button class="btn primary wide" id="detail-want">Lo quiero</button>
+        ${future ? '' : '<button class="btn wide" id="detail-have">Ya lo tengo</button>'}
+      </div>
+    </div>
+    ${facts.length ? `<dl class="facts">${facts.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${v}</dd></div>`).join('')}</dl>` : ''}
+    <section class="rating-block">
+      <h4>Notas de otros lectores</h4>
+      <div id="detail-ext"><p class="muted small">${c.isbn ? 'Buscando notas…' : ''}</p></div>
+      <div class="ext-links">${ratingLinks(c).map((l) => `<a class="ext" href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.source)}</a>`).join('')}</div>
+    </section>`;
+  loadExternal(c);
+}
+
 function renderDetail() {
+  if (preview) {
+    const mine = findAny(preview);   // se acaba de añadir (aquí o al escanearlo)
+    if (mine) { shownId = mine.id; preview = null; } else { renderPreview(preview); return; }
+  }
   const c = byId(shownId);
   if (!c) { if ($('#sheet-detail').open) closeTopLayer(); return; }
   const wish = c.status === 'deseo';
@@ -85,10 +137,11 @@ function renderDetail() {
   loadExternal(c);
 }
 
+let extSeq = 0;
 async function loadExternal(c) {
-  const id = c.id;
+  const seq = ++extSeq;
   const list = c.isbn ? await fetchRatings(c.isbn) : [];
-  if (shownId !== id || !$('#detail-ext')) return;
+  if (seq !== extSeq || !$('#detail-ext')) return;
   $('#detail-ext').innerHTML = list.length
     ? list.map((r) => `<a class="ext-score" href="${esc(r.url)}" target="_blank" rel="noopener"><b>${fmtAvg(r.avg)}</b><span>/5 en ${esc(r.source)}, ${r.count} ${r.count === 1 ? 'voto' : 'votos'}</span></a>`).join('')
     : '<p class="muted small">Esta edición no tiene notas en Google Books ni Open Library. Consúltalas en:</p>';
@@ -104,10 +157,22 @@ $('#detail-body').addEventListener('change', async (e) => {
 });
 
 $('#detail-body').addEventListener('click', async (e) => {
-  const c = byId(shownId);
-  if (!c) return;
   const t = e.target.closest('button');
   if (!t) return;
+  if (preview) {
+    const it = preview;
+    if (t.id === 'detail-series') hooks.openSeries?.(seriesKey(it.series));
+    if (t.id !== 'detail-want' && t.id !== 'detail-have') return;
+    const d = newDraft(it);
+    if (t.id === 'detail-want') { d.status = 'deseo'; d.purchaseDate = null; await saveComic(d); } else await commitDraft(d);
+    shownId = d.id;
+    preview = null;
+    renderDetail();
+    toast(t.id === 'detail-want' ? `Añadido a deseados: ${d.title}` : `Añadido a tu biblioteca: ${d.title}`, 'Deshacer', () => removeComic(d.id));
+    return;
+  }
+  const c = byId(shownId);
+  if (!c) return;
   if (t.dataset.date) {
     const p = $('#date-picker');
     p.dataset.field = t.dataset.date;

@@ -11,9 +11,11 @@ import { renderUpcoming, setupUpcoming } from './views/upcoming.js';
 import { renderSeriesSheet, setupSeries, openSeries } from './views/series.js';
 import { renderProfile, renderSettings, renderAccount, setupProfile } from './views/profile.js';
 import { renderWish, setupWish, refreshWishResults } from './views/wish.js';
+import { renderSearch, setupSearch } from './views/search.js';
 
 const VIEWS = {
   library: { title: 'Biblioteca', tag: () => (libMode() === 'series' ? '全巻' : '本棚'), render: renderLibraryView },
+  search: { title: 'Buscar', tag: '検索', render: renderSearch },
   new: { title: 'Novedades', tag: '新刊', render: renderUpcoming },
   wish: { title: 'Deseados', tag: '欲しい', render: renderWish },
   profile: { title: 'Perfil', tag: '記録', render: () => { renderProfile(); renderSettings(); } },
@@ -29,6 +31,7 @@ function showView(name) {
     t.classList.toggle('on', on);
     if (on) t.setAttribute('aria-current', 'page'); else t.removeAttribute('aria-current');
   });
+  $('#btn-profile').classList.toggle('on', name === 'profile');
   $('#screen-title').textContent = VIEWS[name].title;
   const tag = VIEWS[name].tag;
   $('#screen-tag').textContent = typeof tag === 'function' ? tag() : tag;   // etiqueta de la balda: estantería, colección completa, registro
@@ -75,11 +78,13 @@ async function init() {
   setupProfile();
   setupWish();
   setupUpcoming();
+  setupSearch();
   onChange(render);
 
   $$('.tab[data-view]').forEach((t) => t.addEventListener('click', () => showView(t.dataset.view)));
   $('#btn-scan').addEventListener('click', openScanner);
   $('#btn-add').addEventListener('click', () => openAdd({ focus: true }));
+  $('#btn-profile').addEventListener('click', () => showView('profile'));
   $('#brand').addEventListener('click', () => { setLibMode('comics'); showView('library'); });   // el logo lleva a la página principal
   document.addEventListener('click', (e) => { if (e.target.closest('[data-action="scan"]')) openScanner(); });
 

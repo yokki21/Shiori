@@ -2,7 +2,7 @@
 
 import { db } from './db.js';
 import { initSync, pushComic, pushDelete, pushSeries } from './sync.js';
-import { today } from './util.js';
+import { today, seriesKey } from './util.js';
 
 export const state = {
   comics: [],
@@ -41,6 +41,14 @@ function unindex(c) {
 
 export const byId = (id) => idx.byId.get(id);
 export const byIsbn = (code) => idx.byIsbn.get(code);
+
+// Cómic que ya está en Shiori (en la colección o en deseados) con el mismo ISBN o serie y número
+export function findAny(it) {
+  if (it.isbn && byIsbn(it.isbn)) return byIsbn(it.isbn);
+  const k = seriesKey(it.series || '');
+  if (!k || it.number == null) return null;
+  return state.comics.find((c) => c.number === it.number && seriesKey(c.series || '') === k) || null;
+}
 export const byIssue = (issn, n) => state.comics.find((c) => c.issn === issn && c.number === n && c.status !== 'deseo');
 
 let ownedCache = { v: -1, list: [] };

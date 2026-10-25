@@ -27,45 +27,7 @@ export function seriesList() {
 
   const list = [];
   for (const g of map.values()) {
-    const meta = state.seriesMeta.get(g.key) || {};
-    const cat = catalogSeriesFor(g.name, g.issn);
-    const nums = [...g.byNum.keys()];
-    // Del catálogo solo cuentan los números ya publicados (no las preventas)
-    const now = today();
-    const released = cat ? Object.entries(cat.issues).filter(([, it]) => !it.date || it.date <= now).map(([n]) => +n) : [];
-    const catMax = released.length ? Math.max(...released) : 0;
-    g.cat = cat;
-    if (cat) g.name = cat.name;
-    g.total = meta.total || catMax || null;
-    g.max = Math.min(500, Math.max(g.total || 0, ...nums));
-    g.finished = !!meta.finished;
-    g.owned = g.byNum.size;
-    g.read = [...g.byNum.values()].filter((c) => c.reading === 'leido').length;
-    g.spent = g.items.reduce((s, c) => s + (c.price || 0), 0);
-    g.missing = [];
-    for (let n = 1; n <= g.max; n++) if (!g.byNum.has(n)) g.missing.push(n);
-
-    // Precio de lo que falta: el del catálogo si se conoce; si no, la media de lo que has pagado
-    const own = g.items.filter((c) => c.price != null);
-    const avg = own.length ? own.reduce((s, c) => s + c.price, 0) / own.length : globalAvg;
-    let cost = 0;
-    let estimated = false;
-    let known = true;
-    for (const n of g.missing) {
-      const it = cat ? catalogIssue(cat, n) : null;
-      if (it?.price != null) cost += it.price;
-      else if (avg != null) { cost += avg; estimated = true; } else known = false;
-    }
-    g.missingCost = known ? Math.round(cost * 100) / 100 : null;
-    g.costEstimated = estimated;
-    g.knownTotal = !!(g.total || g.finished);
-    g.complete = g.missing.length === 0 && g.knownTotal;
-
-    const lastOwned = [...g.byNum.values()].sort((a, b) => b.number - a.number)[0];
-    g.cover = lastOwned;
-    const counts = new Map();
-    for (const c of g.items) if (c.publisher) counts.set(c.publisher, (counts.get(c.publisher) || 0) + 1);
-    g.publisher = cat?.publisher || [...counts].sort((a, b) => b[1] - a[1])[0]?.[0] || '';
+    summarize(g, globalAvg);
     list.push(g);
   }
   list.sort((a, b) => b.updated - a.updated);
@@ -73,7 +35,58 @@ export function seriesList() {
   return list;
 }
 
-export const findSeries = (key) => seriesList().find((g) => g.key === key);
+// Cálculos de una serie: total, lo que falta, lo que costaría completarla…
+function summarize(g, globalAvg) {
+  const meta = state.seriesMeta.get(g.key) || {};
+  const cat = catalogSeriesFor(g.name, g.issn);
+  const nums = [...g.byNum.keys()];
+  // Del catálogo solo cuentan los números ya publicados (no las preventas)
+  const now = today();
+  const released = cat ? Object.entries(cat.issues).filter(([, it]) => !it.date || it.date <= now).map(([n]) => +n) : [];
+  const catMax = released.length ? Math.max(...released) : 0;
+  g.cat = cat;
+  if (cat) g.name = cat.name;
+  g.total = meta.total || catMax || null;
+  g.max = Math.min(500, Math.max(g.total || 0, ...nums));
+  g.finished = !!meta.finished;
+  g.owned = g.byNum.size;
+  g.read = [...g.byNum.values()].filter((c) => c.reading === 'leido').length;
+  g.spent = g.items.reduce((s, c) => s + (c.price || 0), 0);
+  g.missing = [];
+  for (let n = 1; n <= g.max; n++) if (!g.byNum.has(n)) g.missing.push(n);
+
+  // Precio de lo que falta: el del catálogo si se conoce; si no, la media de lo que has pagado
+  const own = g.items.filter((c) => c.price != null);
+  const avg = own.length ? own.reduce((s, c) => s + c.price, 0) / own.length : globalAvg;
+  let cost = 0;
+  let estimated = false;
+  let known = true;
+  for (const n of g.missing) {
+    const it = cat ? catalogIssue(cat, n) : null;
+    if (it?.price != null) cost += it.price;
+    else if (avg != null) { cost += avg; estimated = true; } else known = false;
+  }
+  g.missingCost = known ? Math.round(cost * 100) / 100 : null;
+  g.costEstimated = estimated;
+  g.knownTotal = !!(g.total || g.finished);
+  g.complete = g.missing.length === 0 && g.knownTotal;
+
+  const lastOwned = [...g.byNum.values()].sort((a, b) => b.number - a.number)[0];
+  g.cover = lastOwned;
+  const counts = new Map();
+  for (const c of g.items) if (c.publisher) counts.set(c.publisher, (counts.get(c.publisher) || 0) + 1);
+  g.publisher = cat?.publisher || [...counts].sort((a, b) => b[1] - a[1])[0]?.[0] || '';
+  return g;
+}
+
+// Una serie que no tienes pero está en el catálogo (desde la búsqueda): se ve entera, con todo por conseguir
+function catalogOnly(key) {
+  const cat = catalogSeriesFor(key);
+  if (!cat) return null;
+  return summarize({ key, name: cat.name, items: [], byNum: new Map(), updated: 0, issn: cat.issn || null }, null);
+}
+
+export const findSeries = (key) => seriesList().find((g) => g.key === key) || catalogOnly(key);
 
 // Ficha para un número que falta (del catálogo si existe; si no, una plantilla)
 export function missingIssueData(g, n) {

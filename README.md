@@ -10,7 +10,8 @@ App web instalable (PWA) en **https://yokki21.github.io/Shiori/**. Funciona sin 
 - **Añadir sin cámara:** un buscador que entiende título, ISBN o ISSN, o leer el código desde una foto.
 - **Biblioteca:** tus portadas, con buscador y filtro de leídos. Al tocar un cómic ves toda su información y el botón **Marcar como leído**.
 - **Biblioteca y series en una sección:** un selector cambia entre ver tus cómics y ver tus series; el buscador vale para las dos.
-- **Próximas novedades:** lo que Panini y Planeta Cómic aún no han sacado, con fecha y precio, filtrable por editorial y línea; primero los números de tus series y tus deseados.
+- **Buscar:** todo el catálogo por título, serie o ISBN, desde el menú. Cada cómic abre su ficha (información, notas de otros lectores) para apuntarlo en deseados o añadirlo; cada serie, su hoja con lo que tienes y lo que falta.
+- **Próximas novedades:** lo que Panini y Planeta Cómic aún no han sacado, con fecha y precio, filtrable por editorial y línea; tocar una abre su ficha; primero los números de tus series y tus deseados.
 - **Series:** cada serie que tienes, qué números, cuántos te faltan y cuánto costaría completarla. Desde ahí puedes añadir los que te falten.
 - **Deseados:** buscas en el catálogo una serie, grapa o tomo y lo apuntas (o la serie entera). Al escanearlo, pasa solo a la biblioteca.
 - **Notas:** tu nota de 1 a 5 y tu reseña; la nota de Google Books u Open Library si la hay, y enlaces a Goodreads, League of Comic Geeks y Comic Book Roundup.
