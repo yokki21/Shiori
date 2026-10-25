@@ -122,6 +122,8 @@ def build(key, isbn_used, taken_names):
     for p in sorted(loose, key=lambda p: key(p['title'])):
         if p['isbn'] and p['isbn'] in isbn_used:
             continue
+        if re.search(r'\(novela\)|^agenda |calendario 20\d\d', p['title'], re.I):
+            continue   # novelas, agendas y calendarios que se cuelan en los listados de cómic
         o = {'title': p['title'], 'publisher': PUBLISHER}
         for k in ('cover', 'price', 'date', 'isbn', 'pages', 'authors'):
             if p[k]:

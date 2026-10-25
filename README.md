@@ -10,7 +10,7 @@ App web instalable (PWA) en **https://yokki21.github.io/Shiori/**. Funciona sin 
 - **Añadir sin cámara:** un buscador que entiende título, ISBN o ISSN, o leer el código desde una foto.
 - **Biblioteca:** tus portadas, con buscador y filtro de leídos. Al tocar un cómic ves toda su información y el botón **Marcar como leído**.
 - **Biblioteca y series en una sección:** un selector cambia entre ver tus cómics y ver tus series; el buscador vale para las dos.
-- **Próximas novedades:** lo que Panini aún no ha sacado, con fecha y precio; primero los números de tus series y tus deseados.
+- **Próximas novedades:** lo que Panini y Planeta Cómic aún no han sacado, con fecha y precio, filtrable por editorial y línea; primero los números de tus series y tus deseados.
 - **Series:** cada serie que tienes, qué números, cuántos te faltan y cuánto costaría completarla. Desde ahí puedes añadir los que te falten.
 - **Deseados:** buscas en el catálogo una serie, grapa o tomo y lo apuntas (o la serie entera). Al escanearlo, pasa solo a la biblioteca.
 - **Notas:** tu nota de 1 a 5 y tu reseña; la nota de Google Books u Open Library si la hay, y enlaces a Goodreads, League of Comic Geeks y Comic Book Roundup.
@@ -19,6 +19,7 @@ App web instalable (PWA) en **https://yokki21.github.io/Shiori/**. Funciona sin 
 ## De dónde salen los datos
 
 1. **Catálogo propio** (`catalog/catalog.json`): todo el catálogo de cómics y manga de Panini España (Marvel, DC, manga y sus otras líneas), a la venta y agotado, sacado de su web oficial (listados, mapa del sitio y fichas de producto). Cada cómic lleva portada, precio, fecha, páginas y autores; los tomos, su ISBN, y las grapas, el código ISSN y el suplemento que trae su ficha. `tools/panini_raw.json` guarda lo recogido y `python3 tools/build_panini.py` regenera el catálogo. Cada lunes, la tarea «Catálogo semanal» de GitHub ejecuta `tools/update_panini.py` (busca en el mapa del sitio de Panini las fichas nuevas de Marvel y DC y refresca las que salen pronto), regenera el catálogo y lo publica; `tools/panini_manual.json` añade números que no salen en Panini.
+   También entra todo el catálogo de Planeta Cómic (manga y cómic, unos 5.400 tomos) sacado de las fichas de planetadelibros.com: `tools/planeta_raw.json` guarda lo recogido, `tools/build_planeta.py` lo convierte en series y tomos, y la tarea semanal ejecuta `tools/update_planeta.py` (novedades de la página de la editorial, una petición cada 5 s como pide su robots.txt).
 2. **Google Books** (mejor con una clave propia, ver abajo) y **Open Library**.
 3. Lo que completas a mano se queda en tu biblioteca, y las grapas aprenden su serie a partir del primer número.
 
