@@ -8,6 +8,7 @@ Su web no tiene robots.txt. Se pide una página por segundo:
 1. El calendario de salidas: fecha y portada de los próximos tomos.
 2. El catálogo completo: las fichas de títulos nuevos.
 3. Las fichas de los títulos que han tenido salidas hace poco, para recoger la portada de los tomos nuevos.
+4. ISBN y precio de los tomos nuevos en La Comiquería, la tienda online de Ivrea.
 """
 import html, json, os, re, sys, time, urllib.request
 from datetime import date, timedelta
@@ -15,6 +16,8 @@ from datetime import date, timedelta
 HERE = os.path.dirname(os.path.abspath(__file__))
 RAW = os.path.join(HERE, 'ivrea_raw.json')
 BASE = 'https://www.editorialivrea.com/ESP'
+STORE = 'https://www.lacomiqueria.com'
+SHOP = os.path.join(HERE, 'ivrea_isbn.json')
 UA = 'ShioriCatalogo/1.0 (+https://github.com/yokki21/Shiori)'
 MONTHS = {m: i + 1 for i, m in enumerate(['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto',
                                           'septiembre', 'octubre', 'noviembre', 'diciembre'])}
@@ -120,6 +123,22 @@ def main():
             print(f'  + {s}: {p["t"]}', file=sys.stderr)
         raw['series'][s] = p
     raw['series'] = dict(sorted(raw['series'].items()))
+
+    # ISBN y precio de los tomos nuevos, de La Comiquería (la tienda online de Ivrea; su robots.txt permite las fichas)
+    shop = json.load(open(SHOP)) if os.path.exists(SHOP) else {}
+    sm = get(STORE + '/sitemap/sitemap-products-ES-1.xml') or ''
+    paths = [u.split(STORE + '/')[1] for u in re.findall(r'<loc>([^<]+)</loc>', sm) if not re.search(r'/(giftcards|novelas|products)/', u)]
+    for path in [p for p in paths if p not in shop][:300]:
+        time.sleep(1)
+        h = get(f'{STORE}/{path}')
+        if not h:
+            continue
+        t = re.search(r'<h1[^>]*>([\s\S]*?)</h1>', h)
+        isbn = re.search(r'97[89]\d{10}', h)
+        pvp = re.search(r'precio-anterior">\s*([\d.,]+)\s*€', h) or re.search(r'itemprop="price" content="([\d.]+)"', h)
+        shop[path] = {'t': text(t.group(1)) if t else '', 'isbn': isbn.group(0) if isbn else '',
+                      'p': float(pvp.group(1).replace('.', '').replace(',', '.')) if pvp and ',' in pvp.group(1) else (float(pvp.group(1)) if pvp else None)}
+    json.dump(dict(sorted(shop.items())), open(SHOP, 'w'), ensure_ascii=False, separators=(',', ':'))
     json.dump(raw, open(RAW, 'w'), ensure_ascii=False, separators=(',', ':'))
     print(json.dumps({'added': added, 'updated': updated}))
 

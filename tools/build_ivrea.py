@@ -3,9 +3,11 @@
 # Entrada: tools/ivrea_raw.json = {series: {slug: {t, items, st, fam, imgs: {n: portada}, cover}}, cal: [{d, t, n, img}]}
 # sacado de editorialivrea.com/ESP: la ficha de cada título (nombre, autores, demografía y la galería con la
 # portada de cada tomo publicado) y el calendario de salidas (fecha de los próximos tomos).
-# Ivrea no publica ISBN ni precio por tomo: los tomos se reconocen al escanear por el título que dan Google Books
-# u Open Library y se enlazan con su serie por el nombre.
-import json, os, re
+# Ivrea no publica ISBN ni precio por tomo en su web: salen de La Comiquería, su tienda online
+# (tools/ivrea_isbn.json = {ruta: {t, isbn, p}}), cruzando el título del producto con la serie y el número.
+import html, json, os, re
+
+from build_common import ean_ok
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 RAW = os.path.join(HERE, 'ivrea_raw.json')
@@ -63,6 +65,28 @@ def build(key, nice, isbn_used, taken_names):
         if c.get('img') and not io.get('cover'):
             io['cover'] = short(c['img'])
         s['issues'] = dict(sorted(s['issues'].items(), key=lambda kv: int(kv[0])))
+
+    # ISBN y precio de cada tomo, de las fichas de La Comiquería (la tienda online de Ivrea): «GOBLIN SLAYER 03»
+    shop = os.path.join(HERE, 'ivrea_isbn.json')
+    if os.path.exists(shop):
+        for path, r in json.load(open(shop)).items():
+            t = html.unescape(r.get('t') or '').strip()
+            isbn = r.get('isbn') if ean_ok(r.get('isbn')) else None
+            if not t or isbn in isbn_used:
+                continue
+            m = re.match(r'^(.*?\S)\s+(?:N[º°]\s*)?0*(\d{1,3})$', t, re.I)
+            k = key(m.group(1)) if m else key(t)
+            s = by_key.get(k)
+            if s is None:
+                continue
+            io = s['issues'].get(m.group(2).lstrip('0') or '0') if m and 'issues' in s else (s if 'issues' not in s and not m else None)
+            if io is None:
+                continue
+            if isbn and not io.get('isbn'):
+                io['isbn'] = isbn
+                isbn_used.add(isbn)
+            if r.get('p') and not io.get('price'):
+                io['price'] = r['p']
 
     # Nombres que ya usa otra editorial: se distinguen
     for s in series:
