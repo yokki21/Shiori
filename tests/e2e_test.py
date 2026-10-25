@@ -286,6 +286,18 @@ async def main():
         check(all('Norma Editorial' in r for r in rows), f'filtro Norma en novedades: {len(rows)}')
         await pg.click('#new-pubs [data-pub=""]')
 
+        print('Catálogo de Ivrea')
+        await pg.click('.tab[data-view=search]'); await pg.fill('#search-input', 'goblin slayer'); await pg.wait_for_timeout(800)
+        txt = await pg.inner_text('#search-results')
+        check('Ivrea' in txt, f'las series de Ivrea salen en la búsqueda: {txt[:120]!r}')
+        await pg.click('#search-results .row[data-series]:has-text("Ivrea") >> nth=0'); await pg.wait_for_selector('#sheet-series[open]')
+        check(await pg.locator('#series-body .vol').count() >= 10, 'la serie de Ivrea trae sus tomos')
+        await pg.keyboard.press('Escape'); await pg.wait_for_timeout(300)
+        await pg.click('.tab[data-view=new]'); await pg.click('#new-pubs [data-pub="Ivrea"]'); await pg.wait_for_timeout(300)
+        rows = await pg.evaluate("[...document.querySelectorAll('#new-list .rel .row-main span')].map(e => e.textContent)")
+        check(len(rows) > 10 and all('Ivrea' in r for r in rows), f'filtro Ivrea en novedades: {len(rows)}')
+        await pg.click('#new-pubs [data-pub=""]')
+
         print('Catálogo de Panini')
         # El suplemento numera la colección ISSN: el 00021 de 2938-5199 es «Capitán América 4»
         await pg.evaluate("shiori.handleCode('9772938519008', {addon: '00021'})"); await pg.wait_for_timeout(400)

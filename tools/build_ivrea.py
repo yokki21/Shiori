@@ -13,6 +13,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 RAW = os.path.join(HERE, 'ivrea_raw.json')
 PUBLISHER = 'Ivrea'
 IMG = 'https://www.editorialivrea.com/ESP/storage/'
+TODAY = __import__('datetime').date.today().isoformat()
 
 
 def short(url):
@@ -54,12 +55,18 @@ def build(key, nice, isbn_used, taken_names):
     for c in raw.get('cal', []):
         k = key(c['t'])
         s = by_key.get(k) or next((v for kk, v in by_key.items() if 'issues' in v and (kk.startswith(k + ' ') or k.startswith(kk + ' '))), None)
+        if s is None:   # «JOJO'S STEEL BALL RUN» → «JoJo's Bizarre Adventure Parte 7: Steel Ball Run»
+            words = set(k.split())
+            cands = [(len(kk), v) for kk, v in by_key.items() if 'issues' in v and len(words) > 1 and words <= set(kk.split())]
+            s = min(cands, key=lambda x: x[0])[1] if cands else None
         if s is not None and 'issues' not in s:
             continue   # tomo único ya en el catálogo
         if s is None:
-            s = {'name': nice(c['t']), 'publisher': PUBLISHER, 'type': 'manga', 'line': 'Manga', 'issues': {}}
+            s = {'name': re.sub(r'^([¿¡])(\w)', lambda m: m.group(1) + m.group(2).upper(), nice(c['t'])), 'publisher': PUBLISHER, 'type': 'manga', 'line': 'Manga', 'issues': {}}
             series.append(s)
             by_key[k] = s
+        if str(c['n']) in s['issues'] and s['issues'][str(c['n'])].get('cover') and c['d'] <= TODAY:
+            continue   # reimpresión de un tomo ya publicado
         io = s['issues'].setdefault(str(c['n']), {})
         io['date'] = c['d']
         if c.get('img') and not io.get('cover'):
