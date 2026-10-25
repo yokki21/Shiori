@@ -1,6 +1,6 @@
 // Escanear y añadir: cámara, código escrito, foto y búsqueda por título.
 
-import { $, esc, euro, seriesKey, coverHTML, toast, haptic, openDialog, closeAllLayers, pushLayer, closeTopLayer } from './util.js';
+import { $, esc, euro, seriesKey, coverHTML, toast, haptic, openDialog, closeAllLayers, pushLayer, closeTopLayer, IMG_ERR } from './util.js';
 import { state, byIsbn, byIssue, saveComic, removeComic, wishToOwned } from './store.js';
 import { Scanner, scanFile } from './scanner.js';
 import { lookupCode, searchTitle, normalizeIsbn, isIsbn, isIssnEan, issnFromEan, eanFromIssn } from './lookup.js';
@@ -89,7 +89,7 @@ function logLine(c, text, undo) {
   const el = document.createElement('div');
   el.className = 'scan-item';
   const img = c.coverData || c.cover;
-  el.innerHTML = `${img ? `<img src="${esc(img)}" alt="" referrerpolicy="no-referrer">` : '<i class="ph"></i>'}<span><b>${esc(c.title)}</b><br>${esc(text)}</span><button data-a="see">Ver</button>${undo ? '<button data-a="undo">Deshacer</button>' : ''}`;
+  el.innerHTML = `${img ? `<img src="${esc(img)}" alt="" referrerpolicy="no-referrer" onerror="${IMG_ERR}">` : '<i class="ph"></i>'}<span><b>${esc(c.title)}</b><br>${esc(text)}</span><button data-a="see">Ver</button>${undo ? '<button data-a="undo">Deshacer</button>' : ''}`;
   el.addEventListener('click', async (e) => {
     const a = e.target.closest('button')?.dataset.a;
     if (a === 'undo') { await removeComic(c.id); el.remove(); }

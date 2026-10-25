@@ -34,11 +34,21 @@ def code_of(r):
     return None
 
 
+def cover(img, orig):
+    if not img.startswith(IMG):
+        return img or None
+    path = img[len(IMG):]
+    return 'pl:' + (path.replace('/m_libros/', '/original/') if path in orig else path)
+
+
 def build(key, isbn_used, taken_names):
     """Devuelve (series, extras) con el formato de catalog.json. isbn_used y taken_names se actualizan."""
     if not os.path.exists(RAW):
         return [], []
     raw = json.load(open(RAW))
+    # Portadas sin versión mediana (m_libros) en su servidor, comprobadas una a una: se usa la original
+    cov = os.path.join(HERE, 'planeta_covers.json')
+    orig = set(json.load(open(cov))['original']) if os.path.exists(cov) else set()
     groups = defaultdict(list)
     loose = []
     for pid, r in sorted(raw.items(), key=lambda kv: int(kv[0])):
@@ -47,7 +57,7 @@ def build(key, isbn_used, taken_names):
             continue   # página de error del servidor: se vuelve a pedir en la siguiente pasada
         p = {
             'title': t,
-            'cover': ('pl:' + r['img'][len(IMG):]) if (r.get('img') or '').startswith(IMG) else (r.get('img') or None),
+            'cover': cover(r.get('img') or '', orig),
             'price': r.get('p') or None,
             'date': iso(r.get('d')),
             'pages': r.get('pg') or None,

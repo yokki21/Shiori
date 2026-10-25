@@ -57,11 +57,14 @@ export function ranges(nums) {
 }
 
 // Portada (o una portada de color con el nombre si no hay imagen)
+// Si falla una portada: las de Planeta en tamaño medio (m_libros) no existen para muchos tomos; se prueba la original
+export const IMG_ERR = `if(/\\/m_libros\\//.test(this.src)&&!this.dataset.r){this.dataset.r=1;this.src=this.src.replace('/m_libros/','/original/')}else this.remove()`;
+
 export function coverHTML(c, { lazy = true } = {}) {
   const label = c.series || c.title || 'Sin título';
   const img = c.coverData || c.cover;
   const n = Number.isFinite(c.number) ? c.number : null;
-  return `<div class="cover"><div class="cover-ph" style="--h:${hue(label)}"><span class="t">${esc(label)}</span>${n != null ? `<span class="n">${n}</span>` : ''}</div>${img ? `<img src="${esc(img)}" alt=""${lazy ? ' loading="lazy"' : ''} decoding="async" referrerpolicy="no-referrer" onerror="this.remove()">` : ''}</div>`;
+  return `<div class="cover"><div class="cover-ph" style="--h:${hue(label)}"><span class="t">${esc(label)}</span>${n != null ? `<span class="n">${n}</span>` : ''}</div>${img ? `<img src="${esc(img)}" alt=""${lazy ? ' loading="lazy"' : ''} decoding="async" referrerpolicy="no-referrer" onerror="${IMG_ERR}">` : ''}</div>`;
 }
 
 // Vibración distinta según lo que pasa al escanear (para escanear una pila sin mirar)

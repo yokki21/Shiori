@@ -59,6 +59,20 @@ def parse(h):
     }
 
 
+def medium_or_original(img):
+    """Muchos tomos recientes no tienen portada mediana (m_libros) en su servidor: entonces se guarda la original."""
+    if '/m_libros/' not in img:
+        return img
+    try:
+        req = urllib.request.Request(img, method='HEAD', headers={'User-Agent': UA})
+        with urllib.request.urlopen(req, timeout=30) as r:
+            if r.status == 200 and r.headers.get('Content-Type', '').startswith('image'):
+                return img
+    except Exception:
+        pass
+    return img.replace('/m_libros/', '/original/')
+
+
 def main():
     limit = int(sys.argv[sys.argv.index('--max') + 1]) if '--max' in sys.argv else 300
     raw = json.load(open(RAW)) if os.path.exists(RAW) else {}
@@ -96,6 +110,7 @@ def main():
             continue
         if 'planeta c' not in p['ed'].lower() and not re.search(r'c[oó]mic|manga', p['tem'] + p['col'], re.I):
             continue   # en las listas se cuela algún libro que no es cómic
+        p['img'] = medium_or_original(p['img'])
         p['k'] = 'manga' if re.search(r'manga|manhwa', p['tem'] + p['col'], re.I) else 'comic'
         p['s'] = slug
         raw[pid] = p

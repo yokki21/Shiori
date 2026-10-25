@@ -102,6 +102,8 @@ async def new_page(browser, base, video=None, cloud=False):
     await pg.route('https://www.googleapis.com/**', google)
     await pg.route('https://openlibrary.org/**', lambda r: asyncio.ensure_future(r.fulfill(status=200, content_type='application/json', headers={'access-control-allow-origin': '*'}, body='{}')))
     await pg.route('https://covers.openlibrary.org/**', lambda r: asyncio.ensure_future(r.fulfill(status=404, body='')))
+    # Planeta: la portada mediana (m_libros) no existe para muchos tomos; la original sí
+    await pg.route('https://proassets.planetadelibros.com/**', lambda r: asyncio.ensure_future(r.fulfill(status=404, body='') if '/m_libros/' in r.request.url else r.fulfill(status=200, content_type='image/jpeg', body=JPEG)))
     await pg.route('https://www.panini.es/**', lambda r: asyncio.ensure_future(r.fulfill(status=200, content_type='image/jpeg', body=JPEG)))
     await pg.route('https://fonts.googleapis.com/**', lambda r: asyncio.ensure_future(r.fulfill(status=200, content_type='text/css', body='')))
     body = CONFIG if cloud else NOCLOUD
@@ -240,6 +242,13 @@ async def main():
         await pg.evaluate("shiori.handleCode('9788468471525')"); await pg.wait_for_timeout(400)
         op = await pg.evaluate("JSON.stringify(shiori.state.comics.filter(c => c.isbn === '9788468471525').map(c => [c.series, c.number, c.publisher, (c.cover || '').slice(0, 40)]))")
         check('"One Piece",1,"Planeta Cómic","https://proassets.planetadelibros.com' in op, f'tomo de Planeta por ISBN, con serie, número y portada: {op}')
+        await pg.click('.tab[data-view=library]'); await pg.click('#lib-mode [data-mode=comics]'); await pg.wait_for_timeout(400)
+        src = await pg.evaluate("(() => { const c = shiori.state.comics.find(c => c.isbn === '9788468471525'); const i = [...document.querySelectorAll('#lib-grid img')].find(i => i.src.includes('one-piece-n-001')); return i ? i.src : 'sin img'; })()")
+        check('/original/' in src, f'portada de Planeta sin versión mediana: se usa la original ({src[-60:]})')
+        fb = await pg.evaluate("""(async () => { const m = await import('./js/util.js'); const d = document.createElement('div');
+          d.innerHTML = m.coverHTML({ title: 'x', cover: 'https://proassets.planetadelibros.com/usuaris/libros/fotos/1/m_libros/a.jpg' }, { lazy: false });
+          document.body.append(d); await new Promise(r => setTimeout(r, 800)); const i = d.querySelector('img'); const out = i ? i.src : 'sin img'; d.remove(); return out; })()""")
+        check('/original/a.jpg' in fb, f'una portada mediana que falla se cambia por la original: {fb}')
 
         print('Catálogo de Panini')
         # El suplemento numera la colección ISSN: el 00021 de 2938-5199 es «Capitán América 4»
