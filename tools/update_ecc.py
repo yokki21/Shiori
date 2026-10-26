@@ -7,7 +7,7 @@ precio y mes de salida de cada libro. Las portadas no se copian (su robots.txt l
 
 Uso: python3 tools/update_ecc.py [--pages N] [--probe]
   --pages N  solo las N primeras páginas del listado (la tarea semanal mira las primeras, que son lo más nuevo)
-  --probe    guarda además la primera página en tools/ecc_probe.html para revisar su estructura
+  --probe    guarda además la segunda página en tools/ecc_probe.html para revisar su estructura
 """
 import html, json, os, re, sys, time, urllib.request
 
@@ -72,7 +72,7 @@ def main():
         h = get(LIST if n == 1 else f'{PAGED}{n}')
         if not h:
             break
-        if n == 1 and '--probe' in sys.argv:
+        if n == 2 and '--probe' in sys.argv:
             open(os.path.join(HERE, 'ecc_probe.html'), 'w').write(h)
         books = parse(h)
         if not books:
