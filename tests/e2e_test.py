@@ -175,6 +175,13 @@ async def main():
         check(await pg.is_visible('#detail-read'), 'tras añadirlo, la ficha pasa a ser la del cómic tuyo')
         await pg.keyboard.press('Escape'); await pg.wait_for_timeout(300)
         check(await pg.locator('.vol.miss').count() == 6, 'añadir un número que falta desde la serie')
+        # El sello de la portada marca el tomo como leído sin abrir la ficha, y vuelve a desmarcarlo
+        r0 = await pg.evaluate("shiori.state.comics.filter(c => c.reading === 'leido').length")
+        await pg.click('.vol-read:not(.on) >> nth=0'); await pg.wait_for_timeout(300)
+        check(await pg.evaluate("shiori.state.comics.filter(c => c.reading === 'leido').length") == r0 + 1 and not await pg.is_visible('#sheet-detail[open]'), 'marcar leído desde la portada de la serie')
+        check(await pg.locator('.vol-read.on').count() >= 1, 'el sello queda marcado')
+        await pg.click('.vol-read.on >> nth=-1'); await pg.wait_for_timeout(300)
+        check(await pg.evaluate("shiori.state.comics.filter(c => c.reading === 'leido').length") == r0, 'y desmarcarlo')
         await pg.keyboard.press('Escape'); await pg.wait_for_timeout(300)
 
         print('ISSN escrito y selector por portada')

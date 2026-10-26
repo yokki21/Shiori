@@ -322,6 +322,21 @@ select {
 .series-stats span { font-size: 12px; color: var(--sumi-2); }
 .vols { display: grid; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 18px 12px; margin: 16px 0; }
 .vol { position: relative; display: flex; flex-direction: column; justify-content: flex-start; align-self: start; padding: 0; border: 0; background: none; color: var(--sumi); text-align: center; }
+.vol-cell { position: relative; align-self: start; }
+.vol-cell .vol { width: 100%; }
+/* Sello para marcar leído desde la hoja de la serie: apagado si falta, rojo si ya está leído */
+.vol-read {
+  position: absolute; right: 2px; bottom: 22px; z-index: 4;
+  display: grid; place-items: center; width: 34px; height: 34px; padding: 0; border: 0; background: none;
+  color: transparent; font: 800 13px/1 var(--mincho);
+}
+.vol-read::before {
+  content: '済'; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%;
+  border: 1.5px dashed color-mix(in srgb, var(--sumi) 55%, transparent); background: color-mix(in srgb, var(--kami) 80%, transparent);
+  color: color-mix(in srgb, var(--sumi) 45%, transparent); transform: rotate(-10deg); transition: transform .15s;
+}
+.vol-read.on::before { border: 1.5px solid var(--shu); color: var(--shu); background: color-mix(in srgb, var(--kami) 88%, transparent); }
+.vol-read:active::before { transform: rotate(-10deg) scale(.88); }
 .vol-n { display: block; margin-top: 6px; font: 700 14px/1 var(--mincho); text-align: center; }
 .vol-n.t { font: 500 12px/1.3 var(--gothic); text-align: left; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .vol.miss .cover { opacity: .4; filter: grayscale(1); box-shadow: none; outline: 1px dashed var(--sumi-3); outline-offset: -1px; }

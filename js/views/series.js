@@ -1,7 +1,7 @@
 // Series: las que tienes, qué números, cuántos faltan y cuánto costaría completarlas.
 
 import { $, esc, euro, plural, ranges, seriesKey, coverHTML, toast, openDialog, parseIntOrNull } from '../util.js';
-import { byId, saveSeriesMeta, state, wanted } from '../store.js';
+import { byId, saveSeriesMeta, setRead, state, wanted } from '../store.js';
 import { seriesList, findSeries, missingIssueData } from '../series.js';
 import { catalogIssue } from '../catalog.js';
 import { openDetail, openPreview } from '../comic.js';
@@ -69,7 +69,10 @@ export function renderSeriesSheet() {
   for (let n = 1; n <= g.max; n++) {
     const c = g.byNum.get(n);
     if (c) {
-      cells.push(`<button class="vol own${c.reading === 'leido' ? ' read' : ''}" data-id="${esc(c.id)}" aria-label="${loose ? label(n, c) : `Nº ${n}`}, lo tienes${c.reading === 'leido' ? ', leído' : ''}">${coverHTML(c)}<span class="vol-n${loose ? ' t' : ''}">${label(n, c)}</span>${c.reading === 'leido' ? '<span class="mark-read" title="Leído" lang="ja">済</span>' : ''}</button>`);
+      const read = c.reading === 'leido';
+      const name = loose ? label(n, c) : `Nº ${n}`;
+      // El sello 済 de la esquina marca o desmarca el tomo como leído sin abrir su ficha
+      cells.push(`<div class="vol-cell"><button class="vol own${read ? ' read' : ''}" data-id="${esc(c.id)}" aria-label="${name}, lo tienes${read ? ', leído' : ''}">${coverHTML(c)}<span class="vol-n${loose ? ' t' : ''}">${label(n, c)}</span></button><button class="vol-read${read ? ' on' : ''}" data-read="${esc(c.id)}" aria-pressed="${read}" aria-label="${name}: ${read ? 'quitar de leídos' : 'marcar como leído'}" title="${read ? 'Leído' : 'Marcar como leído'}" lang="ja">済</button></div>`);
     } else {
       const it = g.cat ? catalogIssue(g.cat, n) : null;
       cells.push(`<button class="vol miss" data-n="${n}" aria-label="${loose ? label(n) : `Nº ${n}`}, te falta">${coverHTML(it || { series: g.name, number: n })}<span class="vol-n${loose ? ' t' : ''}">${label(n)}</span>${it?.price != null ? `<span class="vol-price">${euro(it.price)}</span>` : ''}${wishNums.has(n) ? '<span class="vol-wish">Deseado</span>' : ''}</button>`);
@@ -100,6 +103,15 @@ export function renderSeriesSheet() {
 $('#series-body').addEventListener('click', async (e) => {
   const g = findSeries(openKey);
   if (!g) return;
+  const rb = e.target.closest('.vol-read');
+  if (rb) {
+    const c = byId(rb.dataset.read);
+    if (!c) return;
+    const read = c.reading !== 'leido';
+    await setRead(c, read);
+    toast(read ? `Leído: ${c.title}` : `Sin leer: ${c.title}`, 'Deshacer', () => setRead({ ...byId(c.id) }, !read));
+    return;
+  }
   const own = e.target.closest('.vol.own');
   if (own) { openDetail(byId(own.dataset.id)); return; }
   const miss = e.target.closest('.vol.miss');
