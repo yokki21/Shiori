@@ -335,6 +335,15 @@ select {
   border: 1.5px dashed color-mix(in srgb, var(--sumi) 55%, transparent); background: color-mix(in srgb, var(--kami) 80%, transparent);
   color: color-mix(in srgb, var(--sumi) 45%, transparent); transform: rotate(-10deg); transition: transform .15s;
 }
+.vol-have {
+  position: absolute; left: 2px; bottom: 22px; z-index: 4;
+  display: grid; place-items: center; width: 34px; height: 34px; padding: 0; border: 0; background: none; color: var(--sumi);
+}
+.vol-have svg {
+  width: 26px; height: 26px; padding: 5px; border-radius: 50%;
+  border: 1.5px dashed color-mix(in srgb, var(--sumi) 55%, transparent); background: color-mix(in srgb, var(--kami) 80%, transparent);
+}
+.vol-have:active svg { transform: scale(.88); }
 .vol-read.on::before { border: 1.5px solid var(--shu); color: var(--shu); background: color-mix(in srgb, var(--kami) 88%, transparent); }
 .vol-read:active::before { transform: rotate(-10deg) scale(.88); }
 .vol-n { display: block; margin-top: 6px; font: 700 14px/1 var(--mincho); text-align: center; }
@@ -544,7 +553,7 @@ dialog.confirm p { margin: 0 0 10px; }
 .row-state { font-size: 13px; font-weight: 700; color: var(--sumi-3); }
 .row-state.wished { color: var(--shu); }
 .series-row .row-main b::before { content: '全'; display: inline-grid; place-items: center; width: 18px; height: 18px; margin-right: 6px; border: 1px solid var(--shu); border-radius: 2px; color: var(--shu); font: 800 11px/1 var(--mincho); vertical-align: 2px; }
-.vol-wish { position: absolute; left: 4px; bottom: 26px; z-index: 3; padding: 1px 6px; background: var(--shu); color: var(--on-shu); font-size: 10.5px; font-weight: 700; }
+.vol-wish { position: absolute; left: 4px; top: 6px; z-index: 3; padding: 1px 6px; background: var(--shu); color: var(--on-shu); font-size: 10.5px; font-weight: 700; }
 
 /* ---------- Notas y reseñas ---------- */
 .rating-block { margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--rule); }

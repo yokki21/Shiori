@@ -8,7 +8,7 @@ con una nube simulada (sin mezclar colecciones al cambiar de cuenta).
 Uso:  pip install playwright pillow && playwright install chromium
       python3 tests/e2e_test.py
 """
-import asyncio, functools, http.server, io, json, os, re, socketserver, sys, tempfile, threading
+import asyncio, json, functools, http.server, io, json, os, re, socketserver, sys, tempfile, threading
 from PIL import Image, ImageDraw, ImageFilter
 from playwright.async_api import async_playwright
 
@@ -182,6 +182,13 @@ async def main():
         check(await pg.locator('.vol-read.on').count() >= 1, 'el sello queda marcado')
         await pg.click('.vol-read.on >> nth=-1'); await pg.wait_for_timeout(300)
         check(await pg.evaluate("shiori.state.comics.filter(c => c.reading === 'leido').length") == r0, 'y desmarcarlo')
+        # En los que faltan: ✓ lo añade y 済 lo añade ya leído (luego se quitan para no cambiar lo que sigue)
+        ids0 = await pg.evaluate("shiori.state.comics.map(c => c.id)")
+        await pg.click('.vol-have >> nth=0'); await pg.wait_for_timeout(400)
+        check(await pg.locator('.vol.miss').count() == 5 and not await pg.is_visible('#sheet-detail[open]'), 'añadir un número que falta con ✓')
+        await pg.click('.vol-read[data-readnew] >> nth=0'); await pg.wait_for_timeout(400)
+        check(await pg.locator('.vol.miss').count() == 4 and await pg.evaluate("shiori.state.comics.filter(c => c.reading === 'leido').length") == r0 + 1, 'añadir uno que falta ya leído con 済')
+        await pg.evaluate("(async (old) => { const m = await import('./js/store.js'); for (const c of [...m.state.comics]) if (!old.includes(c.id)) await m.removeComic(c.id); })(%s)" % json.dumps(ids0)); await pg.wait_for_timeout(300)
         await pg.keyboard.press('Escape'); await pg.wait_for_timeout(300)
 
         print('ISSN escrito y selector por portada')
