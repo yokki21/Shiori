@@ -473,7 +473,7 @@ out = {
     'source': 'Catálogos de Panini España (panini.es), Planeta Cómic (planetadelibros.com), Norma Editorial (normaeditorial.com), Ivrea (editorialivrea.com) y ECC Ediciones (todostuslibros.com)',
     'img': 'https://www.panini.es/media/catalog/product/',
     'imgq': '?quality=80&fit=bounds&height=480&width=320',
-    'imgs': {'pl': build_planeta.IMG, 'nm': build_norma.IMG, 'iv': build_ivrea.IMG},   # portadas de otras editoriales: "pl:ruta"
+    'imgs': {'pl': build_planeta.IMG, 'nm': build_norma.IMG, 'iv': build_ivrea.IMG, 'cg': build_ecc.IMG},   # portadas de otras editoriales: "pl:ruta"
     'series': out_series,
     'extras': out_extras,
 }

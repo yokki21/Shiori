@@ -17,7 +17,7 @@ export function renderSearch() {
   const box = $('#search-results');
   const q = $('#search-input').value.trim();
   if (!q) {
-    box.innerHTML = `<div class="empty"><div class="seal-big" lang="ja" aria-hidden="true">探</div><h2>Busca en el catálogo</h2><p>Más de 23.000 cómics y mangas de Panini, Planeta Cómic, Norma e Ivrea. Toca uno para ver su ficha, apuntarlo en deseados o añadirlo a tu biblioteca.</p></div>`;
+    box.innerHTML = `<div class="empty"><div class="seal-big" lang="ja" aria-hidden="true">探</div><h2>Busca en el catálogo</h2><p>Más de 32.000 cómics y mangas de Panini, Planeta Cómic, Norma, Ivrea y ECC. Toca uno para ver su ficha, apuntarlo en deseados o añadirlo a tu biblioteca.</p></div>`;
     return;
   }
   const seriesRows = found.series.map((s, i) => {

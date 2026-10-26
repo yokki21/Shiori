@@ -315,6 +315,11 @@ async def main():
         check(len(rows) > 10 and all('Ivrea' in r for r in rows), f'filtro Ivrea en novedades: {len(rows)}')
         await pg.click('#new-pubs [data-pub=""]')
 
+        print('Catálogo de ECC')
+        await pg.evaluate("shiori.handleCode('9791387527457')"); await pg.wait_for_timeout(400)
+        ec = await pg.evaluate("JSON.stringify(shiori.state.comics.filter(c => c.isbn === '9791387527457').map(c => [c.series, c.number, c.publisher, (c.cover || '').slice(0, 30)]))")
+        check('"ECC Ediciones","https://static.cegal.es/' in ec and ',4,' in ec, f'tomo de ECC por ISBN, con serie, número y portada: {ec}')
+
         print('Catálogo de Panini')
         # El suplemento numera la colección ISSN: el 00021 de 2938-5199 es «Capitán América 4»
         await pg.evaluate("shiori.handleCode('9772938519008', {addon: '00021'})"); await pg.wait_for_timeout(400)

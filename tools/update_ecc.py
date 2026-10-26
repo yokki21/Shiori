@@ -3,7 +3,7 @@
 
 La web de ECC no deja leer su catálogo de forma automática, así que se usa el listado de la editorial en
 todostuslibros.com, que su robots.txt permite (una petición por segundo): título, ISBN (en el enlace de la ficha),
-precio y mes de salida de cada libro. Las portadas no se copian (su robots.txt las excluye): la app las busca por ISBN.
+precio y mes de salida de cada libro. La portada no se descarga: build_ecc.py enlaza la imagen de CEGAL por el ISBN.
 
 Uso: python3 tools/update_ecc.py [--pages N] [--probe]
   --pages N  solo las N primeras páginas del listado (la tarea semanal mira las primeras, que son lo más nuevo)
