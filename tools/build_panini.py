@@ -459,16 +459,18 @@ used = {i['isbn'] for s in out_series for i in s['issues'].values() if 'isbn' in
 names = {key(s['name']) for s in out_series}
 import build_norma
 import build_ivrea
+import build_ecc
 pl_series, pl_extras = build_planeta.build(key, used, names)
 nm_series, nm_extras = build_norma.build(key, nice, used, names)
 iv_series, iv_extras = build_ivrea.build(key, nice, used, names)
-out_series = sorted(out_series + pl_series + nm_series + iv_series, key=lambda s: key(s['name']))
-out_extras += pl_extras + nm_extras + iv_extras
+ec_series, ec_extras = build_ecc.build(key, nice, used, names)
+out_series = sorted(out_series + pl_series + nm_series + iv_series + ec_series, key=lambda s: key(s['name']))
+out_extras += pl_extras + nm_extras + iv_extras + ec_extras
 
 out = {
     'version': 2,
     'updated': __import__('datetime').date.today().isoformat(),
-    'source': 'Catálogos de Panini España (panini.es), Planeta Cómic (planetadelibros.com), Norma Editorial (normaeditorial.com) e Ivrea (editorialivrea.com)',
+    'source': 'Catálogos de Panini España (panini.es), Planeta Cómic (planetadelibros.com), Norma Editorial (normaeditorial.com), Ivrea (editorialivrea.com) y ECC Ediciones (todostuslibros.com)',
     'img': 'https://www.panini.es/media/catalog/product/',
     'imgq': '?quality=80&fit=bounds&height=480&width=320',
     'imgs': {'pl': build_planeta.IMG, 'nm': build_norma.IMG, 'iv': build_ivrea.IMG},   # portadas de otras editoriales: "pl:ruta"

@@ -15,6 +15,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 RAW = os.path.join(HERE, 'ecc_raw.json')
 BASE = 'https://www.todostuslibros.com'
 LIST = BASE + '/editorial/ecc-ediciones'
+PAGED = BASE + '/editoriales/ecc-ediciones_174634/catalogo?page='   # el enlace de cada página del listado
 UA = 'ShioriCatalogo/1.0 (+https://github.com/yokki21/Shiori)'
 MONTHS = {'ene': 1, 'feb': 2, 'mar': 3, 'abr': 4, 'may': 5, 'jun': 6, 'jul': 7, 'ago': 8, 'sep': 9, 'sept': 9, 'oct': 10, 'nov': 11, 'dic': 12}
 
@@ -68,7 +69,7 @@ def main():
     raw = json.load(open(RAW)) if os.path.exists(RAW) else {}
     added = 0
     for n in range(1, pages + 1):
-        h = get(LIST if n == 1 else f'{LIST}?page={n}')
+        h = get(LIST if n == 1 else f'{PAGED}{n}')
         if not h:
             break
         if n == 1 and '--probe' in sys.argv:
