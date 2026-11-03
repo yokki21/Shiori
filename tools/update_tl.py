@@ -15,7 +15,12 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 # clave: (nombre en la app, enlace de la editorial en todostuslibros.com)
 PUBS = {
     'milkyway': ('Milky Way Ediciones', 'milky-way-ediciones_175001'),
+    'distrito': ('Distrito Manga', 'distrito-manga_178258'),
+    'kitsune': ('Kitsune Books', 'kitsune-books_108604'),
+    'tomodomo': ('Tomodomo', 'ediciones-tomodomo_97969'),
 }
+# Primera página (la que trae fechas) cuando su dirección no coincide con el nombre del enlace
+FIRST = {'tomodomo': 'tomodomo'}
 
 
 def crawl(pub, pages):
@@ -24,7 +29,7 @@ def crawl(pub, pages):
     raw = json.load(open(path)) if os.path.exists(path) else {}
     added = 0
     for n in range(1, pages + 1):
-        h = get(f'{BASE}/editorial/{ref.rsplit("_", 1)[0]}' if n == 1 else f'{BASE}/editoriales/{ref}/catalogo?page={n}')
+        h = get(f'{BASE}/editorial/{FIRST.get(pub, ref.rsplit("_", 1)[0])}' if n == 1 else f'{BASE}/editoriales/{ref}/catalogo?page={n}')
         books = parse(h) if h else {}
         if not books:
             break

@@ -14,7 +14,7 @@ IMG = 'https://static.cegal.es/imagenes/marcadas/'
 # "Dai Dark núm. 07", "Batman y los Outsiders vol. 2 de 4: La verdad sobre Halo", "Kakegurui núm. 01 (Cuarta edición)"
 NUM_RE = re.compile(r'^(.*?\S)\s*,?\s+(?:núm\.|num\.|nº|n\.º|vol\.|#)\s*0*(\d{1,4})(?:\s*/\s*\d+)?(?:\s+de\s+\d+)?\s*(?:[:.-]\s*(.*?))?\s*(\([^)]*\))?$', re.I)
 # Manga: además «Drifting Dragons 21», «Frieren 3 (edición especial)» (número de hasta 3 cifras al final)
-NUM_LOOSE = re.compile(r'^(.*?\S)\s*,?\s+(?:núm\.|num\.|nº|n\.º|vol\.|#)?\s*0*(\d{1,3})(?:\s*/\s*\d+)?(?:\s+de\s+\d+)?\s*(?:[:.-]\s*(.*?))?\s*(\([^)]*\))?$', re.I)
+NUM_LOOSE = re.compile(r'^(.*?\S)\s*,?\s+(?:(?:núm|num|nº|n\.º|n|vol|volumen|tomo)\.?\s+|#)?0*(\d{1,3})(?:\s*/\s*\d+)?(?:\s+de\s+\d+)?\s*(?:[:.-]\s*(.*?))?\s*(\([^)]*\))?$', re.I)
 REPRINT = re.compile(r'(segunda|tercera|cuarta|quinta|sexta|s[eé]ptima|octava|\d+\s*ª?)\s+edici[oó]n', re.I)
 DC_RE = re.compile(r'batman|superman|wonder woman|\bflash\b|green lantern|linterna verde|aquaman|joker|harley|liga de la justicia|nightwing|catwoman|robin\b|titanes|green arrow|shazam|supergirl|batgirl|sandman|watchmen|constantine|hellblazer|darkseid|\bdc\b|absolute|batwoman|zatanna|deathstroke|suicide squad|escuadr[oó]n suicida', re.I)
 
@@ -27,6 +27,9 @@ def build(key, nice, isbn_used, taken_names, raw_path=RAW, publisher=PUBLISHER, 
     recs = []
     for isbn, r in sorted(raw.items()):
         t = re.sub(r'\s+', ' ', r.get('t') or '').strip()
+        letters = [c for c in t if c.isalpha()]
+        if manga and letters and sum(c.isupper() for c in letters) / len(letters) >= 0.8:
+            t = nice(t)   # fichas antiguas en mayúsculas: «ASTRA LOST IN SPACE N 03»
         if not t or not ean_ok(isbn) or re.search(r'\bnovela\b|agenda|calendario', t, re.I):
             continue
         d = r.get('d') or ''
