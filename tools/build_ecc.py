@@ -28,6 +28,8 @@ def build(key, nice, isbn_used, taken_names, raw_path=RAW, publisher=PUBLISHER, 
     for isbn, r in sorted(raw.items()):
         t = re.sub(r'\s+', ' ', r.get('t') or '').strip()
         letters = [c for c in t if c.isalpha()]
+        if manga:   # Distrito Manga añade la demografía: «Cross Game (Shônen)»
+            t = re.sub(r'\s*\((?:sh[oôō]nen|seinen|josei|sh[oôō]jo|kodomo)\)', '', t, flags=re.I).strip()
         if manga and letters and sum(c.isupper() for c in letters) / len(letters) >= 0.8:
             t = nice(t)   # fichas antiguas en mayúsculas: «ASTRA LOST IN SPACE N 03»
         if not t or not ean_ok(isbn) or re.search(r'\bnovela\b|agenda|calendario', t, re.I):
