@@ -7,7 +7,7 @@ on:
         description: Clave de la editorial en tools/update_tl.py (o «todas»)
         default: todas
       probe:
-        description: Solo guardar esta dirección para revisarla (vacío = normal)
+        description: Solo revisar - una dirección, o editoriales separadas por comas (vacío = normal)
         default: ''
 permissions:
   contents: write
@@ -30,10 +30,13 @@ jobs:
       - name: Revisar una página
         if: ${{ github.event.inputs.probe != '' }}
         run: |
-          python3 tools/update_tl.py --probe "${{ github.event.inputs.probe }}"
+          case "${{ github.event.inputs.probe }}" in
+            http*) python3 tools/update_tl.py --probe "${{ github.event.inputs.probe }}" ;;
+            *) python3 tools/update_tl.py --find "${{ github.event.inputs.probe }}" ;;
+          esac
           git config user.name "yokki21"
           git config user.email "jmartinezserrano31@gmail.com"
-          git add -f tools/tl_probe.html && git commit -m "Prueba de página" && git push
+          git add -f tools/tl_probe.* && git commit -m "Prueba de página" && git push
       - name: Leer los listados
         if: ${{ github.event.inputs.probe == '' }}
         run: python3 tools/update_tl.py --pub "${{ github.event.inputs.pub }}"

@@ -52,7 +52,26 @@ def probe(url, dest):
     print(json.dumps({'probe': url, 'bytes': len(h), 'books': len(parse(h))}))
 
 
+def find(slugs):
+    """Busca el enlace de cada editorial (/editoriales/<slug>_<id>) y cuántos títulos tiene (tarea manual)."""
+    import re
+    out = {}
+    for slug in slugs:
+        h = get(f'{BASE}/editorial/{slug}') or ''
+        m = re.search(r'Todos los libros de ([^|<]+)\|\s*(\d+) títulos', h)
+        ref = re.search(r'editoriales/([a-z0-9-]+_\d+)/catalogo', h) or re.search(r'data-destino="([^"]+)"', h)
+        if ref and not ref.group(1).count('_'):
+            import base64
+            dec = base64.b64decode(ref.group(1)).decode('utf-8', 'replace')
+            ref = re.search(r'editoriales/([a-z0-9-]+_\d+)/catalogo', dec)
+        out[slug] = [m.group(1).strip() if m else '', int(m.group(2)) if m else 0, ref.group(1) if ref else '']
+        time.sleep(1)
+    json.dump(out, open(os.path.join(HERE, 'tl_probe.json'), 'w'), ensure_ascii=False, indent=0)
+
+
 def main():
+    if '--find' in sys.argv:
+        return find(sys.argv[sys.argv.index('--find') + 1].split(','))
     if '--probe' in sys.argv:
         return probe(sys.argv[sys.argv.index('--probe') + 1], 'tl_probe.html')
     pub = sys.argv[sys.argv.index('--pub') + 1] if '--pub' in sys.argv else 'todas'
