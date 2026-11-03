@@ -460,12 +460,17 @@ names = {key(s['name']) for s in out_series}
 import build_norma
 import build_ivrea
 import build_ecc
+import build_tl
 pl_series, pl_extras = build_planeta.build(key, used, names)
 nm_series, nm_extras = build_norma.build(key, nice, used, names)
 iv_series, iv_extras = build_ivrea.build(key, nice, used, names)
 ec_series, ec_extras = build_ecc.build(key, nice, used, names)
-out_series = sorted(out_series + pl_series + nm_series + iv_series + ec_series, key=lambda s: key(s['name']))
+out_series = out_series + pl_series + nm_series + iv_series + ec_series
 out_extras += pl_extras + nm_extras + iv_extras + ec_extras
+for _pub, (_s, _e) in build_tl.build(key, nice, used, names).items():   # editoriales de manga de todostuslibros.com
+    out_series += _s
+    out_extras += _e
+out_series = sorted(out_series, key=lambda s: key(s['name']))
 
 # Autores repetidos en todos los números de una serie: se guardan una vez en la serie
 for s in out_series:
@@ -478,7 +483,8 @@ for s in out_series:
 # El catálogo va en un fichero por editorial (catalog/<editorial>.json) y un índice (catalog/catalog.json) con la
 # huella de cada uno: la app solo vuelve a descargar las editoriales que han cambiado desde la última vez.
 import hashlib
-SLUG = {'Panini': 'panini', 'Planeta Cómic': 'planeta', 'Norma Editorial': 'norma', 'Ivrea': 'ivrea', 'ECC Ediciones': 'ecc'}
+SLUG = {'Panini': 'panini', 'Planeta Cómic': 'planeta', 'Norma Editorial': 'norma', 'Ivrea': 'ivrea', 'ECC Ediciones': 'ecc',
+        **{name: pub for pub, (name, _) in build_tl.PUBS.items()}}
 dst_dir = os.path.join(HERE, '..', 'catalog')
 parts, total = [], 0
 for pub, slug in SLUG.items():
@@ -495,7 +501,7 @@ out = {
     'img': 'https://www.panini.es/media/catalog/product/',
     'imgq': '?quality=80&fit=bounds&height=480&width=320',
     'imgs': {'pl': build_planeta.IMG, 'nm': build_norma.IMG, 'iv': build_ivrea.IMG, 'cg': build_ecc.IMG},   # portadas de otras editoriales: "pl:ruta"
-    'parts': parts,
+    'parts': [p for p in parts if p['f'] != 'empty'],
 }
 dst = os.path.join(dst_dir, 'catalog.json')
 json.dump(out, open(dst, 'w'), ensure_ascii=False, separators=(',', ':'))

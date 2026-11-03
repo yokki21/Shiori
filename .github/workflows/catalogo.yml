@@ -40,6 +40,9 @@ jobs:
       - name: Buscar novedades de ECC
         continue-on-error: true
         run: python3 tools/update_ecc.py
+      - name: Buscar novedades de las editoriales de manga (todostuslibros.com)
+        continue-on-error: true
+        run: python3 tools/update_tl.py --pub todas
       - name: Regenerar el catálogo
         run: python3 tools/build_panini.py
       - name: Comprobar el catálogo
@@ -50,7 +53,7 @@ jobs:
         run: |
           git config user.name "yokki21"
           git config user.email "jmartinezserrano31@gmail.com"
-          git add catalog/*.json tools/panini_raw.json tools/panini_skip.json tools/planeta_raw.json tools/norma_raw.json tools/ivrea_raw.json tools/ivrea_isbn.json tools/ecc_raw.json
+          git add catalog/*.json tools/panini_raw.json tools/panini_skip.json tools/planeta_raw.json tools/norma_raw.json tools/ivrea_raw.json tools/ivrea_isbn.json tools/ecc_raw.json tools/tl_*.json
           if git diff --cached --quiet; then echo "Sin cambios"; exit 0; fi
           git commit -m "Catálogo: novedades de Panini, Planeta, Norma, Ivrea y ECC ($(date +%F))"
           git push
