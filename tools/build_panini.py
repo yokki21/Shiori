@@ -490,6 +490,8 @@ parts, total = [], 0
 for pub, slug in SLUG.items():
     part = {'series': [x for x in out_series if x.get('publisher') == pub],
             'extras': [e for e in out_extras if e.get('publisher', 'Panini') == pub]}
+    if not part['series'] and not part['extras']:
+        continue
     body = json.dumps(part, ensure_ascii=False, separators=(',', ':'))
     open(os.path.join(dst_dir, f'{slug}.json'), 'w').write(body)
     parts.append({'p': pub, 'f': f'{slug}.json', 'h': hashlib.sha1(body.encode()).hexdigest()[:10]})

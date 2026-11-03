@@ -28,7 +28,17 @@ function relation(u) {
 export function renderUpcoming() {
   const list = $('#new-list');
   if (!catalogLoaded()) { list.innerHTML = '<div class="spinner"></div>'; loadCatalog().then(renderUpcoming); return; }
-  const all = catalogUpcoming().filter((u) => (!line || u.line === line) && (!pub || u.item.publisher === pub));
+  const every = catalogUpcoming();
+  // Editoriales con algo anunciado, para el desplegable
+  const sel = $('#new-pub');
+  const pubs = [...new Set(every.map((u) => u.item.publisher).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'es'));
+  const want = pubs.join('|');
+  if (sel.dataset.pubs !== want) {
+    sel.innerHTML = `<option value="">Todas</option>${pubs.map((p) => `<option value="${esc(p)}">${esc(p)}</option>`).join('')}`;
+    sel.dataset.pubs = want;
+    sel.value = pubs.includes(pub) ? pub : '';
+  }
+  const all = every.filter((u) => (!line || u.line === line) && (!pub || u.item.publisher === pub));
   // Tus series: las de la colección y las de deseados (por nombre de serie)
   const mine = new Set([...owned(), ...wanted()].map((c) => seriesKey(c.series || '')).filter(Boolean));
   const yours = [];
@@ -68,15 +78,14 @@ export function renderUpcoming() {
 }
 
 export function setupUpcoming() {
-  for (const id of ['#new-filters', '#new-pubs']) {
-    $(id).addEventListener('click', (e) => {
-      const b = e.target.closest('.chip');
-      if (!b) return;
-      if (id === '#new-pubs') pub = b.dataset.pub; else line = b.dataset.line;
-      $$(`${id} .chip`).forEach((x) => { x.classList.toggle('on', x === b); x.setAttribute('aria-pressed', String(x === b)); });
-      renderUpcoming();
-    });
-  }
+  $('#new-filters').addEventListener('click', (e) => {
+    const b = e.target.closest('.chip');
+    if (!b) return;
+    line = b.dataset.line;
+    $$('#new-filters .chip').forEach((x) => { x.classList.toggle('on', x === b); x.setAttribute('aria-pressed', String(x === b)); });
+    renderUpcoming();
+  });
+  $('#new-pub').addEventListener('change', (e) => { pub = e.target.value; renderUpcoming(); });
   // Tocar una novedad abre su ficha (la tuya si ya la tienes o deseas)
   const open = (row) => { const u = shown[+row.dataset.i]; if (u) openPreview(u.item); };
   $('#new-list').addEventListener('keydown', (e) => { const r = e.target.closest('.rel'); if (r && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); open(r); } });

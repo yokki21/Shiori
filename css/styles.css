@@ -599,6 +599,8 @@ dialog.confirm p { margin: 0 0 10px; }
 
 /* ---------- Próximas novedades: el calendario de 新刊 ---------- */
 .new-filter { margin: 0 0 6px; }
+.pub-select { display: flex; align-items: center; gap: 10px; margin: 4px 0 8px; font-size: 14px; color: var(--sumi-2); }
+.pub-select select { flex: 1; min-width: 0; min-height: 40px; padding: 0 10px; border: 1px solid var(--rule); border-radius: 3px; background: var(--kami); color: var(--sumi); font: 500 15px/1 var(--gothic); }
 #new-list .section-title:first-of-type { margin-top: 18px; }
 #new-list .sub { margin: 0 0 4px; }
 .rel {

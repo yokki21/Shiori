@@ -19,7 +19,7 @@ REPRINT = re.compile(r'(segunda|tercera|cuarta|quinta|sexta|s[eé]ptima|octava|\
 DC_RE = re.compile(r'batman|superman|wonder woman|\bflash\b|green lantern|linterna verde|aquaman|joker|harley|liga de la justicia|nightwing|catwoman|robin\b|titanes|green arrow|shazam|supergirl|batgirl|sandman|watchmen|constantine|hellblazer|darkseid|\bdc\b|absolute|batwoman|zatanna|deathstroke|suicide squad|escuadr[oó]n suicida', re.I)
 
 
-def build(key, nice, isbn_used, taken_names, raw_path=RAW, publisher=PUBLISHER, manga=False):
+def build(key, nice, isbn_used, taken_names, raw_path=RAW, publisher=PUBLISHER, manga=False, loose=False):
     """También sirve para las editoriales de manga sacadas del mismo listado (build_tl.py)."""
     if not os.path.exists(raw_path):
         return [], []
@@ -30,7 +30,7 @@ def build(key, nice, isbn_used, taken_names, raw_path=RAW, publisher=PUBLISHER, 
         letters = [c for c in t if c.isalpha()]
         if manga:   # Distrito Manga añade la demografía: «Cross Game (Shônen)»
             t = re.sub(r'\s*\((?:sh[oôō]nen|seinen|josei|sh[oôō]jo|kodomo)\)', '', t, flags=re.I).strip()
-        if manga and letters and sum(c.isupper() for c in letters) / len(letters) >= 0.8:
+        if (manga or loose) and letters and sum(c.isupper() for c in letters) / len(letters) >= 0.8:
             t = nice(t)   # fichas antiguas en mayúsculas: «ASTRA LOST IN SPACE N 03»
         if not t or not ean_ok(isbn) or re.search(r'\bnovela\b|agenda|calendario', t, re.I):
             continue
@@ -38,7 +38,7 @@ def build(key, nice, isbn_used, taken_names, raw_path=RAW, publisher=PUBLISHER, 
         p = {'title': t, 'cover': f'cg:{isbn[:7]}/{isbn[:12]}.gif', 'price': r.get('p') or None, 'date': f'{d}-01' if re.fullmatch(r'\d{4}-\d{2}', d) else '',
              'pages': None, 'authors': None, 'isbn': isbn}
         p['line'], p['type'] = ('Manga', 'manga') if manga else ('DC', 'americano') if DC_RE.search(t) else ('Otros', 'americano')
-        m = (NUM_RE.match(t) or NUM_LOOSE.match(t)) if manga else NUM_RE.match(t)
+        m = (NUM_RE.match(t) or NUM_LOOSE.match(t)) if manga or loose else NUM_RE.match(t)
         if m and not REPRINT.search(m.group(4) or ''):   # las reediciones van sueltas (se reconocen igual por su ISBN)
             p['n'] = int(m.group(2))
             # «(Biblioteca Super Kodomo)», «(Edición Deluxe)»: otra edición, otra serie

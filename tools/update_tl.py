@@ -14,15 +14,43 @@ from update_ecc import BASE, get, parse   # noqa: E402
 HERE = os.path.dirname(os.path.abspath(__file__))
 # clave: (nombre en la app, enlace de la editorial en todostuslibros.com)
 PUBS = {
+    # manga
     'milkyway': ('Milky Way Ediciones', 'milky-way-ediciones_175001'),
     'distrito': ('Distrito Manga', 'distrito-manga_178258'),
     'kitsune': ('Kitsune Books', 'kitsune-books_108604'),
     'tomodomo': ('Tomodomo', 'ediciones-tomodomo_97969'),
     'moztros': ('Moztros', 'moztros-producciones-sl_177736'),
     'ooso': ('Ooso Cómics', 'ooso-comics_174673'),
+    # cómic (europeo, independiente, americano…); Yermo incluye Arechi Manga
+    'astiberri': ('Astiberri', 'astiberri-ediciones_66490'),
+    'dolmen': ('Dolmen', 'tebeos-dolmen-editorial-s-l_71269'),
+    'cupula': ('La Cúpula', 'ediciones-la-cupula-s-l_175795'),
+    'salamandra': ('Salamandra Graphic', 'salamandra-graphic_179778'),
+    'reservoir': ('Reservoir Books', 'reservoir-books_176736'),
+    'sapristi': ('Sapristi', 'sapristi_179812'),
+    'diabolo': ('Diábolo Ediciones', 'diabolo-ediciones_126894'),
+    'dibbuks': ('Dibbuks', 'dibbuks_70911'),
+    'ponentmon': ('Ponent Mon', 'ponent-mon_3403'),
+    'grafito': ('Grafito Editorial', 'grafito-editorial_142955'),
+    'nuevonueve': ('Nuevo Nueve', 'nuevo-nueve-editores-s-l_175496'),
+    'garbuix': ('Garbuix Books', 'garbuix-books_153302'),
+    'bang': ('Bang Ediciones', 'bang-ediciones_123283'),
+    'fulgencio': ('Fulgencio Pimentel', 'fulgencio-pimentel-s-l_77336'),
+    'liana': ('Liana Editorial', 'liana-editorial_174718'),
+    'yermo': ('Yermo / Arechi Manga', 'yermo-ediciones-y-publicaciones-s-l_176080'),
+    'babylon': ('Ediciones Babylon', 'ediciones-babylon_83791'),
+    'komikids': ('Kómikids', 'komikids_152236'),
+    'desfiladero': ('Desfiladero Ediciones', 'desfiladero-ediciones_111271'),
+    'eljueves': ('RBA El Jueves', 'rba-el-jueves_72116'),
+    'spaceman': ('Spaceman Project', 'spaceman-project-s-l_117488'),
+    'sinsentido': ('Sinsentido', 'espacio-sinsentido-sl_73009'),
+    'edt': ('Editores de Tebeos (Glénat)', 'editores-de-tebeos_73782'),
+    'apaapa': ('Apa Apa Cómics', 'apa-apa-comics_65260'),
 }
+MANGA = {'milkyway', 'distrito', 'kitsune', 'tomodomo', 'moztros', 'ooso'}
 # Primera página (la que trae fechas) cuando su dirección no coincide con el nombre del enlace
-FIRST = {'tomodomo': 'tomodomo', 'moztros': 'moztros'}
+FIRST = {'tomodomo': 'tomodomo', 'moztros': 'moztros', 'dolmen': 'dolmen', 'cupula': 'ediciones-la-cupula', 'nuevonueve': 'nuevo-nueve-editores',
+         'fulgencio': 'fulgencio-pimentel', 'yermo': 'yermo-ediciones', 'eljueves': 'ediciones-el-jueves', 'sinsentido': 'ediciones-sinsentido', 'edt': 'glenat'}
 
 
 def crawl(pub, pages):
