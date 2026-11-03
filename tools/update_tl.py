@@ -45,7 +45,16 @@ def crawl(pub, pages):
     return added, len(raw)
 
 
+def probe(url, dest):
+    """Guarda una página para revisar su estructura (tarea manual)."""
+    h = get(url) or ''
+    open(os.path.join(HERE, dest), 'w').write(h)
+    print(json.dumps({'probe': url, 'bytes': len(h), 'books': len(parse(h))}))
+
+
 def main():
+    if '--probe' in sys.argv:
+        return probe(sys.argv[sys.argv.index('--probe') + 1], 'tl_probe.html')
     pub = sys.argv[sys.argv.index('--pub') + 1] if '--pub' in sys.argv else 'todas'
     pages = int(sys.argv[sys.argv.index('--pages') + 1]) if '--pages' in sys.argv else 400
     out = {p: crawl(p, pages) for p in (PUBS if pub == 'todas' else [pub])}
