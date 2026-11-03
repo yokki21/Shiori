@@ -467,20 +467,40 @@ ec_series, ec_extras = build_ecc.build(key, nice, used, names)
 out_series = sorted(out_series + pl_series + nm_series + iv_series + ec_series, key=lambda s: key(s['name']))
 out_extras += pl_extras + nm_extras + iv_extras + ec_extras
 
+# Autores repetidos en todos los números de una serie: se guardan una vez en la serie
+for s in out_series:
+    auth = {i.get('authors') for i in s['issues'].values()}
+    if len(s['issues']) > 1 and len(auth) == 1 and None not in auth:
+        s['authors'] = auth.pop()
+        for i in s['issues'].values():
+            del i['authors']
+
+# El catálogo va en un fichero por editorial (catalog/<editorial>.json) y un índice (catalog/catalog.json) con la
+# huella de cada uno: la app solo vuelve a descargar las editoriales que han cambiado desde la última vez.
+import hashlib
+SLUG = {'Panini': 'panini', 'Planeta Cómic': 'planeta', 'Norma Editorial': 'norma', 'Ivrea': 'ivrea', 'ECC Ediciones': 'ecc'}
+dst_dir = os.path.join(HERE, '..', 'catalog')
+parts, total = [], 0
+for pub, slug in SLUG.items():
+    part = {'series': [x for x in out_series if x.get('publisher') == pub],
+            'extras': [e for e in out_extras if e.get('publisher', 'Panini') == pub]}
+    body = json.dumps(part, ensure_ascii=False, separators=(',', ':'))
+    open(os.path.join(dst_dir, f'{slug}.json'), 'w').write(body)
+    parts.append({'p': pub, 'f': f'{slug}.json', 'h': hashlib.sha1(body.encode()).hexdigest()[:10]})
+    total += len(body.encode())
 out = {
-    'version': 2,
+    'version': 3,
     'updated': __import__('datetime').date.today().isoformat(),
     'source': 'Catálogos de Panini España (panini.es), Planeta Cómic (planetadelibros.com), Norma Editorial (normaeditorial.com), Ivrea (editorialivrea.com) y ECC Ediciones (todostuslibros.com)',
     'img': 'https://www.panini.es/media/catalog/product/',
     'imgq': '?quality=80&fit=bounds&height=480&width=320',
     'imgs': {'pl': build_planeta.IMG, 'nm': build_norma.IMG, 'iv': build_ivrea.IMG, 'cg': build_ecc.IMG},   # portadas de otras editoriales: "pl:ruta"
-    'series': out_series,
-    'extras': out_extras,
+    'parts': parts,
 }
-dst = os.path.join(HERE, '..', 'catalog', 'catalog.json')
+dst = os.path.join(dst_dir, 'catalog.json')
 json.dump(out, open(dst, 'w'), ensure_ascii=False, separators=(',', ':'))
 
 n_issues = sum(len(s['issues']) for s in out_series)
 n_isbn = sum(1 for s in out_series for i in s['issues'].values() if 'isbn' in i) + sum(1 for e in out_extras if 'isbn' in e)
 print(f"{len(out_series)} series ({sum(1 for s in out_series if 'issn' in s)} con ISSN), {n_issues} números, "
-      f"{len(out_extras)} sueltos, {n_isbn} con ISBN, {os.path.getsize(dst) // 1024} KB", file=sys.stderr)
+      f"{len(out_extras)} sueltos, {n_isbn} con ISBN, {total // 1024} KB en {len(parts)} ficheros", file=sys.stderr)

@@ -1,7 +1,7 @@
 // Service worker: la app abre sin conexión y con mala cobertura.
 // Archivos propios: red primero con límite de 2,5 s; si tarda o falla, la copia guardada.
 // No se guardan imágenes de otras webs: el navegador las cuenta como ~7 MB cada una.
-const VERSION = 'shiori-v31';
+const VERSION = 'shiori-v32';
 const SHELL = [
   './', 'index.html', 'css/styles.css', 'manifest.webmanifest', 'catalog/catalog.json',
   'js/app.js', 'js/util.js', 'js/store.js', 'js/db.js', 'js/sync.js', 'js/config.js',
@@ -10,6 +10,7 @@ const SHELL = [
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/favicon.svg', 'icons/apple-touch-icon.png',
 ];
 const FONTS = 'shiori-fonts';
+const CATALOG = 'shiori-catalog';   // ficheros del catálogo: se conservan entre versiones de la app
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(VERSION)
@@ -19,7 +20,7 @@ self.addEventListener('install', (e) => {
 
 self.addEventListener('activate', (e) => {
   e.waitUntil(caches.keys()
-    .then((keys) => Promise.all(keys.filter((k) => k !== VERSION && k !== FONTS).map((k) => caches.delete(k))))
+    .then((keys) => Promise.all(keys.filter((k) => k !== VERSION && k !== FONTS && k !== CATALOG).map((k) => caches.delete(k))))
     .then(() => self.clients.claim()));
 });
 
@@ -43,6 +44,22 @@ self.addEventListener('fetch', (e) => {
     return;
   }
   if (url.origin !== location.origin) return;
+
+  // Ficheros del catálogo con huella (catalog/panini.json?v=…): no cambian nunca, se sirven de la copia guardada
+  if (url.pathname.includes('/catalog/') && url.searchParams.has('v')) {
+    e.respondWith(caches.open(CATALOG).then(async (cache) => {
+      const hit = await cache.match(req);
+      if (hit) return hit;
+      const res = await fetch(req);
+      if (res.ok) {
+        // se borra la versión anterior de ese mismo fichero
+        for (const old of await cache.keys()) if (new URL(old.url).pathname === url.pathname) await cache.delete(old);
+        await cache.put(req, res.clone());
+      }
+      return res;
+    }));
+    return;
+  }
 
   e.respondWith((async () => {
     const cache = await caches.open(VERSION);

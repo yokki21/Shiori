@@ -1,7 +1,8 @@
 // Catálogo propio de Shiori (catalog/catalog.json): cómics con su código,
 // portada, precio y fecha, para añadirlos al instante al escanear.
 //
-// Formato (versión 2):
+// Formato (versión 3): catalog.json es un índice { img, imgq, imgs, parts: [{ p: editorial, f: fichero, h: huella }] }
+// y cada fichero lleva { series, extras } con este formato (el de la versión 2, que también se acepta entero):
 //   img, imgq: prefijo y parámetros de las portadas (cover puede ser una ruta relativa)
 //   series: [{ name, publisher, type, ean?, issn?, issues: { "1": { title?, cover, price, date, isbn?, pages?, authors?, issn?, a? } } }]
 //   extras: [{ title, cover, price, date, isbn?, issn?, a?, ... }]   (sueltos, sin número)
@@ -29,40 +30,53 @@ const coverUrl = (c) => {
   return `${data.img || ''}${c}${data.imgq || ''}`;
 };
 
+// Añade al índice las series y sueltos de una parte del catálogo
+function indexPart(part) {
+  const addAddon = (issn, a, get) => {
+    if (!byAddon.has(issn)) byAddon.set(issn, new Map());
+    if (!byAddon.get(issn).has(a)) byAddon.get(issn).set(a, get);
+  };
+  for (const s of part.series || []) {
+    // Para cada ISSN, la serie con más números (la que se ofrece si no se lee el número)
+    if (s.issn && Object.keys(s.issues).length > Object.keys(byIssn.get(s.issn)?.issues || {}).length) byIssn.set(s.issn, s);
+    if (!byKey.has(key(s.name))) byKey.set(key(s.name), s);
+    for (const [n, it] of Object.entries(s.issues || {})) {
+      const get = () => catalogIssue(s, n);
+      if (it.isbn) byIsbn.set(it.isbn, get);
+      if ((it.issn || s.issn) && !it.noa) addAddon(it.issn || s.issn, it.a ?? +n, get);   // noa: su suplemento es de otro número
+      index.push({ t: fold(it.title || `${s.name} ${n}`), s: fold(s.name), n: +n, get });
+    }
+  }
+  for (const [code, it] of Object.entries(part.isbn || {})) {
+    const get = () => ({ ...it, cover: coverUrl(it.cover), isbn: code, publishedDate: it.date || '' });
+    byIsbn.set(code, get);
+    index.push({ t: fold(it.title), s: fold(it.series || it.title), n: it.number ?? 0, get });
+  }
+  for (const it of part.extras || []) {
+    const { a, line, ...rest } = it;
+    const get = () => ({ publisher: 'Panini', type: 'americano', ...rest, cover: coverUrl(it.cover), publishedDate: it.date || '' });
+    if (it.isbn) byIsbn.set(it.isbn, get);
+    if (it.issn && it.a != null) addAddon(it.issn, it.a, get);
+    index.push({ t: fold(it.title), s: fold(it.title), n: 0, get });
+  }
+}
+
+// El catálogo (versión 3) es un índice con un fichero por editorial; cada fichero lleva su huella en la
+// dirección, así que el navegador lo guarda y solo vuelve a pedir los que han cambiado.
 export function loadCatalog() {
   if (!loading) {
-    loading = fetch('catalog/catalog.json')
-      .then((r) => (r.ok ? r.json() : null))
-      .catch(() => null)
-      .then((j) => {
-        data = j || { series: [], isbn: {}, extras: [] };
+    const getJson = (u) => fetch(u).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+    loading = getJson('catalog/catalog.json')
+      .then(async (j) => {
+        const parts = j?.version >= 3 ? await Promise.all((j.parts || []).map((p) => getJson(`catalog/${p.f}?v=${p.h}`))) : [j];
+        data = { ...(j || {}), series: [], extras: [], isbn: {} };
         index = [];
-        const addAddon = (issn, a, get) => {
-          if (!byAddon.has(issn)) byAddon.set(issn, new Map());
-          if (!byAddon.get(issn).has(a)) byAddon.get(issn).set(a, get);
-        };
-        for (const s of data.series || []) {
-          // Para cada ISSN, la serie con más números (la que se ofrece si no se lee el número)
-          if (s.issn && Object.keys(s.issues).length > Object.keys(byIssn.get(s.issn)?.issues || {}).length) byIssn.set(s.issn, s);
-          if (!byKey.has(key(s.name))) byKey.set(key(s.name), s);
-          for (const [n, it] of Object.entries(s.issues || {})) {
-            const get = () => catalogIssue(s, n);
-            if (it.isbn) byIsbn.set(it.isbn, get);
-            if ((it.issn || s.issn) && !it.noa) addAddon(it.issn || s.issn, it.a ?? +n, get);   // noa: su suplemento es de otro número
-            index.push({ t: fold(it.title || `${s.name} ${n}`), s: fold(s.name), n: +n, get });
-          }
-        }
-        for (const [code, it] of Object.entries(data.isbn || {})) {
-          const get = () => ({ ...it, cover: coverUrl(it.cover), isbn: code, publishedDate: it.date || '' });
-          byIsbn.set(code, get);
-          index.push({ t: fold(it.title), s: fold(it.series || it.title), n: it.number ?? 0, get });
-        }
-        for (const it of data.extras || []) {
-          const { a, line, ...rest } = it;
-          const get = () => ({ publisher: 'Panini', type: 'americano', ...rest, cover: coverUrl(it.cover), publishedDate: it.date || '' });
-          if (it.isbn) byIsbn.set(it.isbn, get);
-          if (it.issn && it.a != null) addAddon(it.issn, it.a, get);
-          index.push({ t: fold(it.title), s: fold(it.title), n: 0, get });
+        for (const part of parts) {
+          if (!part) continue;
+          indexPart(part);
+          data.series.push(...(part.series || []));
+          data.extras.push(...(part.extras || []));
+          Object.assign(data.isbn, part.isbn || {});
         }
         index.sort((a, b) => a.s.localeCompare(b.s) || a.n - b.n);
         return data;
@@ -94,7 +108,7 @@ export function catalogIssue(series, n) {
     cover: coverUrl(it.cover), price: it.price ?? null, publishedDate: it.date || '',
     ...((it.issn || series.issn) && { issn: it.issn || series.issn }),
     ...((it.issn || series.issn) === series.issn && series.ean && { barcode: series.ean }),
-    ...(it.isbn && { isbn: it.isbn }), ...(it.pages && { pages: it.pages }), ...(it.authors && { authors: it.authors }),
+    ...(it.isbn && { isbn: it.isbn }), ...(it.pages && { pages: it.pages }), ...((it.authors || series.authors) && { authors: it.authors || series.authors }),
   };
 }
 

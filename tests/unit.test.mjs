@@ -113,8 +113,12 @@ test('nombres de editorial normalizados', () => {
 
 test('catálogo: portadas, ISBN, ISSN y búsqueda', async () => {
   const { readFile } = await import('node:fs/promises');
-  const json = JSON.parse(await readFile(new URL('../catalog/catalog.json', import.meta.url)));
-  globalThis.fetch = async () => ({ ok: true, json: async () => json });
+  // El catálogo va partido por editorial: índice + un fichero por editorial
+  const read = async (f) => JSON.parse(await readFile(new URL(`../catalog/${f}`, import.meta.url)));
+  const manifest = await read('catalog.json');
+  const parts = await Promise.all(manifest.parts.map((p) => read(p.f)));
+  const json = { series: parts.flatMap((p) => p.series), extras: parts.flatMap((p) => p.extras) };
+  globalThis.fetch = async (u) => ({ ok: true, json: async () => (String(u).includes('?v=') ? parts[manifest.parts.findIndex((p) => String(u).includes(p.f))] : manifest) });
   const cat = await import('../js/catalog.js');
   await cat.loadCatalog();
   const mm = cat.catalogSeries('3081-6009');
