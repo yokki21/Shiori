@@ -18,9 +18,11 @@ PUBS = {
     'distrito': ('Distrito Manga', 'distrito-manga_178258'),
     'kitsune': ('Kitsune Books', 'kitsune-books_108604'),
     'tomodomo': ('Tomodomo', 'ediciones-tomodomo_97969'),
+    'moztros': ('Moztros', 'moztros-producciones-sl_177736'),
+    'ooso': ('Ooso Cómics', 'ooso-comics_174673'),
 }
 # Primera página (la que trae fechas) cuando su dirección no coincide con el nombre del enlace
-FIRST = {'tomodomo': 'tomodomo'}
+FIRST = {'tomodomo': 'tomodomo', 'moztros': 'moztros'}
 
 
 def crawl(pub, pages):
